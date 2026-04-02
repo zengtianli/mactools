@@ -1,0 +1,82 @@
+# Downloads 自动整理规则配置
+# 用法: python3 downloads_organizer.py [--dry-run] [--scan-archive]
+
+# 目标根目录（分类子文件夹建在这里）
+target_dir: ~/Downloads
+
+# 扫描目录列表（只扫描一级文件）
+scan_dirs:
+  - ~/Downloads
+
+# 额外扫描目录（--scan-archive 时启用）
+archive_dirs:
+  - ~/Downloads/归档/其他文档
+
+# 分类规则：目录名 -> 扩展名列表
+categories:
+  软件安装包:
+    - .dmg
+    - .pkg
+    - .iso
+    - .app
+    - .exe
+  压缩包:
+    - .zip
+    - .rar
+    - .7z
+    - .tar.gz
+    - .tar
+  文档:
+    - .docx
+    - .doc
+    - .pdf
+    - .xlsx
+    - .xls
+    - .pptx
+    - .ppt
+    - .csv
+    - .txt
+    - .md
+    - .html
+  图片:
+    - .png
+    - .jpg
+    - .jpeg
+    - .gif
+    - .svg
+    - .webp
+    - .heic
+    - .bmp
+    - .tiff
+  视频音频:
+    - .mp4
+    - .mov
+    - .mp3
+    - .wav
+    - .avi
+    - .mkv
+    - .flac
+    - .aac
+  邮件:
+    - .eml
+    - .msg
+  配置文件:
+    - .plist
+    - .json
+    - .yaml
+    - .yml
+    - .toml
+    - .conf
+    - .ini
+    - .cfg
+
+# 不匹配任何规则时的 fallback 目录
+fallback: 其他
+
+# 忽略规则
+ignore_prefixes:
+  - "~$"
+  - "."
+
+# 日志路径
+log_file: ~/.local/log/downloads_organizer.log
