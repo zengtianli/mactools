@@ -10,7 +10,7 @@
 # @raycast.packageName File Utils
 # @raycast.description Auto cleanup: organize by type → AI rename → project sort
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(realpath "$0")")" SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)" pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PYTHON=$(which python3)
 SCRIPTS="$REPO_ROOT/scripts/file"
