@@ -12,7 +12,7 @@ OA_DIR="$HOME/Dev/oa-project"
 OA_URL="http://localhost:3000"
 PORT=3000
 MAX_WAIT=10
-STREAMLIT="$HOME/miniforge3/bin/streamlit"
+STREAMLIT="uv run --project $HOME/Dev/hydro-toolkit streamlit"
 
 # 检查端口是否被占用
 check_port() {

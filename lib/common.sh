@@ -19,8 +19,8 @@ readonly PROJECT_ROOT="$(cd "$_COMMON_SH_DIR/.." && pwd)"
 readonly SCRIPTS_DIR="$PROJECT_ROOT/scripts"
 
 # ===== 环境变量设置 =====
-# 确保 miniforge bin 在 PATH 中（Raycast 非交互式 shell 不继承 alias/profile）
-readonly MINIFORGE_BIN="$HOME/miniforge3/bin"
+# 确保 homebrew bin 在 PATH 中（Raycast 非交互式 shell 不继承 alias/profile）
+readonly MINIFORGE_BIN="/opt/homebrew/bin"
 if [ -d "$MINIFORGE_BIN" ]; then
     export PATH="$MINIFORGE_BIN:$PATH"
 fi
