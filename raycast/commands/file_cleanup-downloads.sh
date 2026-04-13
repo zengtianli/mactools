@@ -10,15 +10,13 @@
 # @raycast.packageName File Utils
 # @raycast.description Auto cleanup: organize by type → AI rename → project sort
 
-SCRIPT_DIR="$(cd "$(dirname "$(realpath "$0")")" SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)" pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PYTHON=$(which python3)
-SCRIPTS="$REPO_ROOT/scripts/file"
+source "$(dirname "$(realpath "$0")")/../lib/run_python.sh"
 
-source ~/.zshrc 2>/dev/null
+# run_python uses exec, so we define a non-exec variant for multi-step scripts
+_uv_python() { local s="$1"; shift; uv run --project "$PROJECT_ROOT" python3 "$SCRIPTS_DIR/$s" "$@"; }
 
 echo "=== Step 1: 按扩展名分类 ==="
-$PYTHON "$SCRIPTS/downloads_organizer.py" --scan-archive
+_uv_python "file/downloads_organizer.py" --scan-archive
 if [ $? -ne 0 ]; then
     echo "❌ Step 1 失败，中止"
     exit 1
@@ -26,13 +24,13 @@ fi
 
 echo ""
 echo "=== Step 2: AI 分析 + 重命名 ==="
-$PYTHON "$SCRIPTS/smart_rename.py" analyze --all
+_uv_python "file/smart_rename.py" analyze --all
 if [ $? -ne 0 ]; then
     echo "❌ Step 2 analyze 失败，中止"
     exit 1
 fi
 
-$PYTHON "$SCRIPTS/smart_rename.py" execute
+_uv_python "file/smart_rename.py" execute
 if [ $? -ne 0 ]; then
     echo "❌ Step 2 execute 失败，可用 smart_rename.py rollback 回滚"
     exit 1
@@ -40,7 +38,7 @@ fi
 
 echo ""
 echo "=== Step 3: 按项目归组 ==="
-$PYTHON "$SCRIPTS/project_sort.py"
+_uv_python "file/project_sort.py"
 
 echo ""
 echo "========================================="
