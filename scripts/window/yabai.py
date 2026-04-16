@@ -46,7 +46,12 @@ def cmd_toggle():
         print("yabai started")
 
 
-COMMANDS = {"float": cmd_float, "mouse": cmd_mouse, "org": cmd_org, "toggle": cmd_toggle}
+def cmd_restart():
+    subprocess.run(["yabai", "--restart-service"])
+    print("yabai restarted")
+
+
+COMMANDS = {"float": cmd_float, "mouse": cmd_mouse, "org": cmd_org, "toggle": cmd_toggle, "restart": cmd_restart}
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else None

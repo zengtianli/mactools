@@ -57,7 +57,7 @@ def main():
     outdated_formulae = result.stdout.strip().split("\n") if result.stdout.strip() else []
     if outdated_formulae:
         print(f"   需升级：{', '.join(outdated_formulae)}")
-        subprocess.run(["brew", "upgrade", "--formula"], timeout=600)
+        subprocess.run(["brew", "upgrade", "--formula"])
         print("✅ Formula 升级完成")
     else:
         print("   全部已是最新")

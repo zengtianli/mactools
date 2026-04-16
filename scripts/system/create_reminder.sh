@@ -42,11 +42,21 @@ if [ -z "$REMINDER_TIME" ]; then
     end tell
 end tell"
 else
-    # 带时间的提醒
+    # 带时间的提醒 — 逐字段构造日期，避免 locale 导致字符串解析失败
+    # 解析 YYYY-MM-DD HH:MM
+    IFS='-: ' read -r Y M D h m <<< "$REMINDER_TIME"
+    # 去掉前导零（AppleScript 数字不接受 08 等）
+    M=$((10#$M)); D=$((10#$D)); h=$((10#$h)); m=$((10#$m))
     APPLESCRIPT="tell application \"Reminders\"
+    set d to current date
+    set year of d to $Y
+    set month of d to $M
+    set day of d to $D
+    set hours of d to $h
+    set minutes of d to $m
+    set seconds of d to 0
     tell list \"$LIST_NAME\"
-        set newReminder to make new reminder with properties {name:\"$REMINDER_TEXT\"}
-        set remind me date of newReminder to date \"$REMINDER_TIME\"
+        make new reminder with properties {name:\"$REMINDER_TEXT\", due date:d, remind me date:d}
     end tell
 end tell"
 fi
