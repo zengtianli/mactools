@@ -101,14 +101,15 @@ def main():
     else:
         print("\n✅ 无孤儿 cask")
 
-    # 5. 升级在用 cask
-    print(f"\n⬆️  检查 {len(active)} 个在用 cask 的更新...")
+    # 5. 升级在用 cask（含 non-app cask 如 CLI 工具、字体等）
+    upgradable = active + non_app
+    print(f"\n⬆️  检查 {len(upgradable)} 个在用 cask 的更新（含 {len(non_app)} 个 non-app）...")
     result = subprocess.run(
         ["brew", "outdated", "--cask", "--greedy"],
         capture_output=True, text=True, timeout=120,
     )
     outdated = set(result.stdout.strip().split("\n")) if result.stdout.strip() else set()
-    to_upgrade = [t for t in active if t in outdated]
+    to_upgrade = [t for t in upgradable if t in outdated]
 
     if to_upgrade:
         print(f"   需升级（{len(to_upgrade)}个）：{', '.join(to_upgrade)}")
