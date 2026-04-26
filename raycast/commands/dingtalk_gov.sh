@@ -1,6 +1,6 @@
 #!/bin/bash
 # @raycast.schemaVersion 1
-# @raycast.title 启动政务钉钉
+# @raycast.title Launch Gov DingTalk
 # @raycast.mode silent
 # @raycast.icon 💬
 # @raycast.packageName Apps

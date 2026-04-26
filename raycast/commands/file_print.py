@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @raycast.schemaVersion 1
-# @raycast.title 打印 Finder 选中文件
+# @raycast.title Print Finder Selection
 # @raycast.mode fullOutput
 # @raycast.icon 🖨️
 # @raycast.packageName File Utils

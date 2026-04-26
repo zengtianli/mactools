@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @raycast.schemaVersion 1
-# @raycast.title Yabai 窗口操作
+# @raycast.title Yabai Window Ops
 # @raycast.mode fullOutput
 # @raycast.icon 🪟
 # @raycast.packageName Window

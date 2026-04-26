@@ -1,6 +1,6 @@
 #!/bin/bash
 # @raycast.schemaVersion 1
-# @raycast.title 创建提醒事项
+# @raycast.title Create Reminder
 # @raycast.mode fullOutput
 # @raycast.icon ⏰
 # @raycast.packageName System

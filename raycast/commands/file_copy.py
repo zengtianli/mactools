@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @raycast.schemaVersion 1
-# @raycast.title 复制 Finder 选中路径
+# @raycast.title Copy Finder Selection
 # @raycast.mode silent
 # @raycast.icon 📋
 # @raycast.packageName File Utils

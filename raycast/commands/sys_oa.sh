@@ -3,7 +3,7 @@
 # Required parameters:
 # @raycast.schemaVersion 1
 # @raycast.packageName OA 系统
-# @raycast.title 打开 OA
+# @raycast.title Open OA
 # @raycast.description 启动并打开 OA 统一管理平台（Streamlit）
 # @raycast.icon 🏢
 # @raycast.mode fullOutput

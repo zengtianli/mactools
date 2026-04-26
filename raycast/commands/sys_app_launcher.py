@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @raycast.schemaVersion 1
-# @raycast.title 启动必备应用
+# @raycast.title Launch Essential Apps
 # @raycast.mode fullOutput
 # @raycast.icon 🚀
 # @raycast.packageName System

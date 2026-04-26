@@ -1,6 +1,6 @@
 #!/Users/tianli/Dev/tools/mactools/.venv/bin/python3
 # @raycast.schemaVersion 1
-# @raycast.title 智能重命名 Downloads
+# @raycast.title Smart Rename Downloads
 # @raycast.mode fullOutput
 # @raycast.icon ✨
 # @raycast.packageName File Utils

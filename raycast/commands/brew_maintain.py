@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @raycast.schemaVersion 1
-# @raycast.title 维护 Homebrew
+# @raycast.title Maintain Homebrew
 # @raycast.mode fullOutput
 # @raycast.icon 🍺
 # @raycast.packageName System
