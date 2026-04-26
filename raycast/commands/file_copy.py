@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# @raycast.schemaVersion 1
+# @raycast.title 复制 Finder 选中路径
+# @raycast.mode silent
+# @raycast.icon 📋
+# @raycast.packageName File Utils
+# @raycast.description 复制 Finder 选中文件的路径或名称到剪贴板
 
 import os
 import subprocess

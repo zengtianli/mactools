@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# @raycast.schemaVersion 1
+# @raycast.title Yabai 窗口操作
+# @raycast.mode fullOutput
+# @raycast.icon 🪟
+# @raycast.packageName Window
+# @raycast.description Yabai 窗口管理（float/mouse/org/toggle）
+# @raycast.argument1 { "type": "text", "placeholder": "float | mouse | org | toggle" }
 """
 Yabai 窗口管理统一工具
 

@@ -1,6 +1,13 @@
 #!/bin/bash
+# @raycast.schemaVersion 1
+# @raycast.title 创建提醒事项
+# @raycast.mode fullOutput
+# @raycast.icon ⏰
+# @raycast.packageName System
+# @raycast.description 创建 Apple 提醒事项
+# @raycast.argument1 { "type": "text", "placeholder": "提醒内容" }
+# @raycast.argument2 { "type": "text", "placeholder": "时间 YYYY-MM-DD HH:MM (可选)", "optional": true }
 
-# Apple 提醒事项创建脚本
 # 使用 AppleScript 与 Reminders.app 交互
 
 # 参数：

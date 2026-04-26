@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# @raycast.schemaVersion 1
+# @raycast.title 维护 Homebrew
+# @raycast.mode fullOutput
+# @raycast.icon 🍺
+# @raycast.packageName System
+# @raycast.description 升级 formula + 清理孤儿 cask + 升级在用 cask
 """Homebrew 全量维护：升级 formula + 清理孤儿 cask + 升级在用 cask"""
 
 import json

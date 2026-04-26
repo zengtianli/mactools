@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# @raycast.schemaVersion 1
+# @raycast.title 打印 Finder 选中文件
+# @raycast.mode fullOutput
+# @raycast.icon 🖨️
+# @raycast.packageName File Utils
+# @raycast.description 打印 Finder 当前选中的文件
 
 import subprocess
 import sys

@@ -1,9 +1,18 @@
 #!/bin/bash
 # @raycast.schemaVersion 1
-# @raycast.title dingtalk_gov
-# @raycast.mode fullOutput
-# @raycast.icon 💼
+# @raycast.title 启动政务钉钉
+# @raycast.mode silent
+# @raycast.icon 💬
 # @raycast.packageName Apps
-# @raycast.description 启动政务钉钉（DingTalkGov）
+# @raycast.description 启动政务钉钉应用，已运行则跳过
 
-source "$(dirname "$(realpath "$0")")/../lib/run_python.sh" && run_shell "system/dingtalk_gov.sh" "$@"
+# 检查是否已经在运行
+if pgrep -f "DingTalkGov" > /dev/null; then
+    echo "政务钉钉已在运行"
+    exit 0
+fi
+
+# 启动政务钉钉
+/opt/homebrew/bin/wine ~/.wine/drive_c/Program\ Files\ \(x86\)/DingTalkGov/DingTalkGovLauncher.exe &
+
+echo "政务钉钉启动中..."

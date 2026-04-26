@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# @raycast.schemaVersion 1
+# @raycast.title 启动必备应用
+# @raycast.mode fullOutput
+# @raycast.icon 🚀
+# @raycast.packageName System
+# @raycast.description 按 ~/Desktop/essential_apps.txt 批量启动应用
 
 import os
 import re

@@ -15,8 +15,8 @@ _COMMON_SH_LOADED=1
 readonly _COMMON_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # PROJECT_ROOT: 项目根目录 (lib 的上级)
 readonly PROJECT_ROOT="$(cd "$_COMMON_SH_DIR/.." && pwd)"
-# SCRIPTS_DIR: 脚本目录
-readonly SCRIPTS_DIR="$PROJECT_ROOT/scripts"
+# COMMANDS_DIR: Raycast 命令/脚本统一目录（2026-04-26 扁平化后无 scripts/ 子分类）
+readonly COMMANDS_DIR="$PROJECT_ROOT/raycast/commands"
 
 # ===== 环境变量设置 =====
 # 确保 uv 和 homebrew 的 bin 在 PATH 中（Raycast 非交互式 shell 不继承 profile）

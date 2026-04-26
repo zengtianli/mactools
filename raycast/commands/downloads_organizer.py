@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+#!/Users/tianli/Dev/tools/mactools/.venv/bin/python3
+# @raycast.schemaVersion 1
+# @raycast.title 整理 Downloads
+# @raycast.mode fullOutput
+# @raycast.icon 📂
+# @raycast.packageName File Utils
+# @raycast.description 按扩展名分类 Downloads 到子目录
 """Downloads 自动整理工具 - 按文件扩展名分类到子目录。
 
 用法:

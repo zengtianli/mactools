@@ -1,4 +1,11 @@
-#!/usr/bin/env python3
+#!/Users/tianli/Dev/tools/mactools/.venv/bin/python3
+# @raycast.schemaVersion 1
+# @raycast.title 智能重命名 Downloads
+# @raycast.mode fullOutput
+# @raycast.icon ✨
+# @raycast.packageName File Utils
+# @raycast.description AI 分析+重命名 Downloads（带子命令）
+# @raycast.argument1 { "type": "text", "placeholder": "analyze --all | execute | rollback" }
 """Downloads 智能重命名工具 - AI 驱动的文件分析、分组与重命名。
 
 用法:
