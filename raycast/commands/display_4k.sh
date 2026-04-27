@@ -9,6 +9,7 @@
 
 # Documentation:
 # @raycast.description Set external displays to 4K (3840x2160)
+source ~/Dev/devtools/lib/log_usage.sh
 
 # 获取当前配置命令
 CURRENT_CONFIG=$(displayplacer list 2>/dev/null | tail -1)

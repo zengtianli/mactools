@@ -5,6 +5,7 @@
 # @raycast.icon 💬
 # @raycast.packageName Apps
 # @raycast.description 启动政务钉钉应用，已运行则跳过
+source ~/Dev/devtools/lib/log_usage.sh
 
 # 检查是否已经在运行
 if pgrep -f "DingTalkGov" > /dev/null; then

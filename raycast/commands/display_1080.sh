@@ -9,6 +9,7 @@
 
 # Documentation:
 # @raycast.description Set external displays to 1080p (1920x1080) for presentation
+source ~/Dev/devtools/lib/log_usage.sh
 
 # 获取当前配置命令
 CURRENT_CONFIG=$(displayplacer list 2>/dev/null | tail -1)

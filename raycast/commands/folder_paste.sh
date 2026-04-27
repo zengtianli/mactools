@@ -6,6 +6,7 @@
 # @raycast.icon 📋
 # @raycast.packageName Custom
 # @raycast.description 将剪贴板中的文件粘贴到 Finder 当前目录
+source ~/Dev/devtools/lib/log_usage.sh
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"
 

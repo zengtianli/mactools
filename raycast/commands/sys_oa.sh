@@ -7,6 +7,7 @@
 # @raycast.description 启动并打开 OA 统一管理平台（Streamlit）
 # @raycast.icon 🏢
 # @raycast.mode fullOutput
+source ~/Dev/devtools/lib/log_usage.sh
 
 OA_DIR="$HOME/Dev/oa-project"
 OA_URL="http://localhost:3000"

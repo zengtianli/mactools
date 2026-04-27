@@ -5,6 +5,8 @@
 # @raycast.icon 🖨️
 # @raycast.packageName File Utils
 # @raycast.description 打印 Finder 当前选中的文件
+import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/devtools/lib"))
+import log_usage  # noqa: F401  (import 即埋点)
 
 import subprocess
 import sys

@@ -5,6 +5,8 @@
 # @raycast.icon 📂
 # @raycast.packageName File Utils
 # @raycast.description 按扩展名分类 Downloads 到子目录
+import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/devtools/lib"))
+import log_usage  # noqa: F401  (import 即埋点)
 """Downloads 自动整理工具 - 按文件扩展名分类到子目录。
 
 用法:

@@ -6,6 +6,8 @@
 # @raycast.packageName File Utils
 # @raycast.description AI 分析+重命名 Downloads（带子命令）
 # @raycast.argument1 { "type": "text", "placeholder": "analyze --all | execute | rollback" }
+import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/devtools/lib"))
+import log_usage  # noqa: F401  (import 即埋点)
 """Downloads 智能重命名工具 - AI 驱动的文件分析、分组与重命名。
 
 用法:
