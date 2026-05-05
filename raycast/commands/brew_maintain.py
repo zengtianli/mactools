@@ -15,6 +15,8 @@ import subprocess
 import sys
 import time
 
+EXCLUDE = {"claude", "typora"}
+
 
 def get_cask_app_map():
     """批量获取所有已安装 cask 及其 .app 路径"""
@@ -117,7 +119,10 @@ def main():
         capture_output=True, text=True, timeout=120,
     )
     outdated = set(result.stdout.strip().split("\n")) if result.stdout.strip() else set()
-    to_upgrade = [t for t in upgradable if t in outdated]
+    to_upgrade = [t for t in upgradable if t in outdated and t not in EXCLUDE]
+    skipped = [t for t in upgradable if t in outdated and t in EXCLUDE]
+    if skipped:
+        print(f"   ⏭️  跳过排除清单：{', '.join(skipped)}")
 
     if to_upgrade:
         print(f"   需升级（{len(to_upgrade)}个）：{', '.join(to_upgrade)}")
