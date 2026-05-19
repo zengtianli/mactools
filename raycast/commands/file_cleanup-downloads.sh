@@ -9,7 +9,7 @@
 # @raycast.icon 🧹
 # @raycast.packageName File Utils
 # @raycast.description Auto cleanup: organize by type → AI rename → project sort
-source ~/Dev/devtools/lib/log_usage.sh
+source ~/Dev/tools/dev/lib/log_usage.sh
 
 HERE="$(dirname "$(realpath "$0")")"
 PROJECT_ROOT="$HERE/../.."

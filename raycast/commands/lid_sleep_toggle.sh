@@ -11,7 +11,7 @@
 # @raycast.description 切换盒盖睡眠（盒盖时让 Mac 不睡，CC / 长任务继续跑）。详细输出当前电源、睡眠阻断进程、超时设置。已配 passwordless sudo。
 # @raycast.author tianli
 
-source ~/Dev/devtools/lib/log_usage.sh
+source ~/Dev/tools/dev/lib/log_usage.sh
 
 CURRENT=$(pmset -g | awk '/SleepDisabled/ {print $2}')
 [ -z "$CURRENT" ] && CURRENT=0

@@ -6,7 +6,7 @@
 # @raycast.packageName Window
 # @raycast.description Yabai 窗口管理（float/mouse/org/toggle）
 # @raycast.argument1 { "type": "text", "placeholder": "float | mouse | org | toggle" }
-import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/devtools/lib"))
+import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 """
 Yabai 窗口管理统一工具

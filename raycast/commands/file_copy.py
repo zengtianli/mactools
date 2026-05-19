@@ -5,7 +5,7 @@
 # @raycast.icon 📋
 # @raycast.packageName File Utils
 # @raycast.description 复制 Finder 选中文件的路径或名称到剪贴板
-import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/devtools/lib"))
+import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 
 import os
