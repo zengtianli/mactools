@@ -34,7 +34,7 @@ import yaml
 
 # Add lib to path for importing shared modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "lib"))
-from llm_client import chat as llm_chat
+from llm_client import chat_many
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -347,25 +347,28 @@ def analyze_with_ai(
         logger.info("没有需要分析的文件")
         return results
 
-    # Process in batches
-    for batch_start in range(0, len(all_indices), batch_size):
-        batch = all_indices[batch_start : batch_start + batch_size]
-        batch_num = batch_start // batch_size + 1
-        total_batches = (len(all_indices) + batch_size - 1) // batch_size
-        logger.info("AI 分析 batch %d/%d (%d 个文件)...", batch_num, total_batches, len(batch))
+    # Split into independent batches. Each batch's prompt is built from a
+    # disjoint set of indices and its result is written to distinct slots in
+    # `results`, so the batches have no inter-dependency → run them in parallel.
+    batches = [
+        all_indices[batch_start : batch_start + batch_size]
+        for batch_start in range(0, len(all_indices), batch_size)
+    ]
+    total_batches = len(batches)
+    logger.info("AI 分析 %d 个文件，分 %d 个 batch 并行调用...", len(all_indices), total_batches)
 
-        prompt = build_batch_prompt(files, batch, dup_indices)
-        try:
-            response = llm_chat(system=SYSTEM_PROMPT, message=prompt)
-            items = parse_ai_response(response)
-            for item in items:
-                batch_pos = item.get("index", 0) - 1  # 1-based to 0-based within batch
-                if 0 <= batch_pos < len(batch):
-                    global_idx = batch[batch_pos]
-                    item["index"] = global_idx + 1  # Store global 1-based index
-                    results[global_idx] = item
-        except Exception as e:
-            logger.error("  AI 调用失败: %s", e)
+    chat_items = [
+        {"system": SYSTEM_PROMPT, "message": build_batch_prompt(files, batch, dup_indices)}
+        for batch in batches
+    ]
+
+    # 一次性并行 fork（保序返回，单项失败 → Exception 实例）
+    responses = chat_many(chat_items, max_workers=8)
+
+    # 保序消费：第 i 个响应对应第 i 个 batch
+    for batch_num, (batch, response) in enumerate(zip(batches, responses, strict=True), 1):
+        if isinstance(response, Exception):
+            logger.error("  AI 调用失败 (batch %d/%d): %s", batch_num, total_batches, response)
             # Fill failed batch with skip
             for idx in batch:
                 if results[idx] is None:
@@ -374,14 +377,17 @@ def analyze_with_ai(
                         "group": "未分析",
                         "new_name": files[idx]["name"],
                         "action": "skip",
-                        "reason": f"AI 调用失败: {e}",
+                        "reason": f"AI 调用失败: {response}",
                     }
+            continue
 
-        # Brief pause between batches
-        if batch_start + batch_size < len(all_indices):
-            import time
-
-            time.sleep(1)
+        items = parse_ai_response(response)
+        for item in items:
+            batch_pos = item.get("index", 0) - 1  # 1-based to 0-based within batch
+            if 0 <= batch_pos < len(batch):
+                global_idx = batch[batch_pos]
+                item["index"] = global_idx + 1  # Store global 1-based index
+                results[global_idx] = item
 
     # Fill any None results
     for i, r in enumerate(results):
