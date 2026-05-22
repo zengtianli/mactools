@@ -1,0 +1,10 @@
+# catalog.yaml — 模块 SSOT(认知单位,仿 Backstage catalog-info.yaml)
+name: mactools
+domain: dev-infra
+function: 让我用脚本驱动 macOS 自动化(窗口/提醒/粘贴/文件夹等)并经 Raycast 一键触发系统级操作
+public_api: mactools CLI
+key_scripts: [folder_paste.sh, yabai.py, create_reminder.sh]
+depends_on: [dev-corelib, dockit, mailroom, llm-client, photo-app, doctools]
+tier: CORE
+owner: tianli
+docs: ./README.md
