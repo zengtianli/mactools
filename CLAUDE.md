@@ -40,6 +40,6 @@ lib/                # 公共库（display, file_ops, finder, clipboard, env, usa
 ## 开发约定
 
 - 新脚本直接写到 `raycast/commands/`，头部加 `# @raycast.*` 元数据 + chmod +x
-- 用 `pyyaml` 等依赖的 Python 用 `#!/Users/tianli/Dev/tools/mactools/.venv/bin/python3` shebang
+- 用 `pyyaml` 等依赖的 Python 用 `#!/Users/tianli/Dev/.venv/bin/python3` shebang（共享 uv workspace venv）
 - 纯 stdlib 用 `#!/usr/bin/env python3`
 - 公共库放 `lib/`，不要在 commands/ 下创建独立 lib

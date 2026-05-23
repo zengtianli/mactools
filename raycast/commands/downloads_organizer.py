@@ -1,4 +1,4 @@
-#!/Users/tianli/Dev/tools/mactools/.venv/bin/python3
+#!/Users/tianli/Dev/.venv/bin/python3
 # @raycast.schemaVersion 1
 # @raycast.title Organize Downloads
 # @raycast.mode fullOutput
