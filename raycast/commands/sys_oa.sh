@@ -42,7 +42,20 @@ fi
 
 # 检查目录是否存在
 if [ ! -d "$OA_DIR" ]; then
-    echo "错误：OA 目录不存在 ($OA_DIR)"
+    echo "❌ OA_DIR 未配置或路径不存在: $OA_DIR"
+    echo ""
+    echo "请编辑本脚本配置正确路径："
+    echo "  文件: $0"
+    echo "  第 12 行: OA_DIR=\"\$HOME/Dev/oa-project\"   ← 改为实际 OA 项目目录"
+    echo "  第 16 行: STREAMLIT=\"... hydro-toolkit ...\"   ← hydro-toolkit 路径也已失效，请同步修正"
+    exit 1
+fi
+
+# 检查 streamlit 项目目录是否存在（STREAMLIT 命令引用的 --project 路径）
+STREAMLIT_PROJECT="$HOME/Dev/stations/web-stack/services/hydro-toolkit"
+if [ ! -d "$STREAMLIT_PROJECT" ]; then
+    echo "❌ Streamlit 运行环境项目不存在: $STREAMLIT_PROJECT"
+    echo "   请编辑第 16 行 STREAMLIT 变量，指向有效的 uv project 目录"
     exit 1
 fi
 

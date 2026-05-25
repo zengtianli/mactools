@@ -38,7 +38,13 @@ fi
 
 echo ""
 echo "=== Step 3: 按项目归组 ==="
-_uv_python "project_sort.py"
+# project_sort.py 历史已删（mactools 仓库 git log 无该脚本任何提交记录）；
+# 保留 if 守卫等未来重建。当前 Step 3 静默跳过不视为失败。
+if [ -f "$HERE/project_sort.py" ]; then
+    _uv_python "project_sort.py"
+else
+    echo "⚠️  project_sort.py 不存在，跳过 Step 3（按项目归组）"
+fi
 
 echo ""
 echo "========================================="
