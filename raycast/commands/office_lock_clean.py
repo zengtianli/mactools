@@ -19,13 +19,16 @@ Microsoft Office 打开文档时会在同目录生成属主/锁文件 `~$<文件
 用法:
     python3 office_lock_clean.py                 # 全盘默认根目录,移到废纸篓
     python3 office_lock_clean.py --dry-run       # 预览,只列不动
+    python3 office_lock_clean.py --quit-office    # 先优雅关闭所有 Office(存盘)再清
     python3 office_lock_clean.py --force         # 跳过进程检查(谨慎)
     python3 office_lock_clean.py --roots ~/Desktop,~/Work   # 自定义扫描根
     python3 office_lock_clean.py --json          # 机器可读输出(供 Hammerspoon 用)
 
 设计契约(铁律 #1.X 机械活=确定性脚本 / #7 删除走可恢复废纸篓):
   - 默认移废纸篓而非 rm -f,本机 rm 已 alias trash,脚本内显式移废纸篓更可审计;
-  - 进程检查是权威闸门,Hammerspoon 调用时不传 --force,脚本自身二次把关。
+  - 进程检查是权威闸门,Hammerspoon 调用时不传 --force,脚本自身二次把关;
+  - --quit-office(用户钦定授权 2026-05-30):先 `quit saving yes` 优雅关闭所有
+    Office(存盘不丢数据,非 force-kill),轮询确认退出后再清——满足「我开着你关了它」。
 """
 
 import argparse
@@ -35,11 +38,21 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # 真正的 Office 应用可执行路径片段(精确匹配,排除 widget / "passWORD" 误匹配)
 OFFICE_PROC_RE = r"MacOS/Microsoft (Word|Excel|PowerPoint|OneNote)"
 LIBRE_PROC_RE = r"soffice\.bin"
+
+# 可被 --quit-office 优雅关闭的应用(AppleScript 应用名 → 是否支持 saving 参数)
+QUITTABLE_APPS = [
+    ("Microsoft Word", True),
+    ("Microsoft Excel", True),
+    ("Microsoft PowerPoint", True),
+    ("Microsoft OneNote", False),
+    ("LibreOffice", False),
+]
 
 # 默认扫描根(承载文档的目录;避开 Library/缓存)
 DEFAULT_ROOTS = ["~/Dev", "~/Work", "~/Apps", "~/Archives",
@@ -63,6 +76,30 @@ def office_running():
         except FileNotFoundError:
             pass
     return procs
+
+
+def quit_office_apps(timeout=20):
+    """优雅关闭所有运行中的 Office(`quit saving yes` 存盘,非 force-kill)。
+    轮询至全部退出或超时;返回 (quit_attempted, still_running)。"""
+    attempted = []
+    for app, can_save in QUITTABLE_APPS:
+        # 仅对在运行的应用发 quit,saving yes = 保存所有改动后退出(不丢数据)
+        save_clause = " saving yes" if can_save else ""
+        script = (f'if application "{app}" is running then '
+                  f'tell application "{app}" to quit{save_clause}')
+        try:
+            subprocess.run(["osascript", "-e", script],
+                           capture_output=True, text=True, timeout=15)
+            attempted.append(app)
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+    # 轮询确认退出(未保存的 Untitled 文档会弹存盘框 → 超时后留给闸门处理)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not office_running():
+            break
+        time.sleep(1)
+    return attempted, office_running()
 
 
 def is_lock_file(name: str) -> bool:
@@ -122,11 +159,18 @@ def main():
     ap = argparse.ArgumentParser(description="清理残留 Office ~$ 锁文件")
     ap.add_argument("--dry-run", action="store_true", help="只列出不删除")
     ap.add_argument("--force", action="store_true", help="跳过 Office 进程检查")
+    ap.add_argument("--quit-office", action="store_true",
+                    help="先优雅关闭所有 Office(存盘)再清(用户授权)")
     ap.add_argument("--roots", help="逗号分隔的扫描根(覆盖默认)")
     ap.add_argument("--json", action="store_true", help="JSON 输出")
     args = ap.parse_args()
 
     roots = args.roots.split(",") if args.roots else DEFAULT_ROOTS
+
+    # 可选: 先优雅关闭 Office(存盘),再走清理
+    quit_attempted = []
+    if args.quit_office and not args.dry_run:
+        quit_attempted, _ = quit_office_apps()
 
     # 闸门 1: 进程检查
     running = [] if args.force else office_running()
@@ -151,11 +195,14 @@ def main():
         "found": [str(f) for f in files],
         "deleted": [str(f) for f in moved],
         "count": len(moved),
+        "quit_office": quit_attempted,
     }
     if args.json:
         print(json.dumps(result, ensure_ascii=False))
         return
 
+    if quit_attempted:
+        print(f"🚪 已优雅关闭(存盘): {', '.join(quit_attempted)}")
     if not files:
         print("✅ Office 已全部关闭,未发现残留 ~$ 锁文件。")
         return
