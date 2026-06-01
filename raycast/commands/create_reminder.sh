@@ -4,15 +4,15 @@
 # @raycast.mode fullOutput
 # @raycast.icon ⏰
 # @raycast.packageName System
-# @raycast.description 创建 Apple 提醒事项
-# @raycast.argument1 { "type": "text", "placeholder": "提醒内容" }
-# @raycast.argument2 { "type": "text", "placeholder": "时间 YYYY-MM-DD HH:MM (可选)", "optional": true }
+# @raycast.description Create an Apple Reminder
+# @raycast.argument1 { "type": "text", "placeholder": "Reminder text" }
+# @raycast.argument2 { "type": "text", "placeholder": "Time YYYY-MM-DD HH:MM (optional)", "optional": true }
 source ~/Dev/tools/dev/lib/log_usage.sh
 
 # 使用 AppleScript 与 Reminders.app 交互
 
 # 参数：
-# $1 - 提醒内容（必需）
+# $1 - Reminder text（必需）
 # $2 - 提醒时间（可选，格式：YYYY-MM-DD HH:MM）
 # $3 - 列表名称（可选，默认为 "Reminders"）
 # --dry-run - 测试模式，仅输出命令不实际执行
@@ -35,8 +35,8 @@ LIST_NAME="${ARGS[2]:-Reminders}"
 
 # 验证必需参数
 if [ -z "$REMINDER_TEXT" ]; then
-    echo "❌ 错误：请提供提醒内容"
-    echo "用法: $0 <提醒内容> [时间] [列表名称] [--dry-run]"
+    echo "❌ 错误：请提供Reminder text"
+    echo "用法: $0 <Reminder text> [时间] [列表名称] [--dry-run]"
     echo "示例: $0 \"查看工作报告\" \"2026-03-02 18:00\" \"work\""
     exit 1
 fi
@@ -75,7 +75,7 @@ if [ "$DRY_RUN" = true ]; then
     echo "---"
     echo "$APPLESCRIPT"
     echo "---"
-    echo "提醒内容: $REMINDER_TEXT"
+    echo "Reminder text: $REMINDER_TEXT"
     [ -n "$REMINDER_TIME" ] && echo "提醒时间: $REMINDER_TIME"
     echo "列表名称: $LIST_NAME"
 else

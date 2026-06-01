@@ -4,7 +4,7 @@
 # @raycast.mode silent
 # @raycast.icon 💬
 # @raycast.packageName Apps
-# @raycast.description 启动政务钉钉应用，已运行则跳过
+# @raycast.description Launch the Gov DingTalk app; skip if already running
 source ~/Dev/tools/dev/lib/log_usage.sh
 
 # 检查是否已经在运行

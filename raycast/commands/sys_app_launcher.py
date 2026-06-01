@@ -4,7 +4,7 @@
 # @raycast.mode fullOutput
 # @raycast.icon 🚀
 # @raycast.packageName System
-# @raycast.description 按 ~/Desktop/essential_apps.txt 批量启动应用
+# @raycast.description Batch-launch apps listed in ~/Desktop/essential_apps.txt
 import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 

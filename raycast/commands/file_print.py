@@ -4,7 +4,7 @@
 # @raycast.mode fullOutput
 # @raycast.icon 🖨️
 # @raycast.packageName File Operations
-# @raycast.description 打印 Finder 当前选中的文件
+# @raycast.description Print the currently Finder-selected file
 import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 

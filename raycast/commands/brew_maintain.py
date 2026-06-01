@@ -4,7 +4,7 @@
 # @raycast.mode fullOutput
 # @raycast.icon 🍺
 # @raycast.packageName System
-# @raycast.description 升级 formula + 清理孤儿 cask + 升级在用 cask
+# @raycast.description Upgrade formulae + remove orphan casks + upgrade installed casks
 import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 """Homebrew 全量维护：升级 formula + 清理孤儿 cask + 升级在用 cask"""

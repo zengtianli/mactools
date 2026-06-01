@@ -8,7 +8,7 @@
 # @raycast.packageName System
 
 # Documentation:
-# @raycast.description 切换盒盖睡眠（盒盖时让 Mac 不睡，CC / 长任务继续跑）。详细输出当前电源、睡眠阻断进程、超时设置。已配 passwordless sudo。
+# @raycast.description Toggle lid sleep (keep Mac awake when lid closed so CC / long tasks keep running). Prints power state, sleep-blocking processes, timeout. Passwordless sudo configured.
 # @raycast.author tianli
 
 source ~/Dev/tools/dev/lib/log_usage.sh

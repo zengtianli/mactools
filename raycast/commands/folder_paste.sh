@@ -1,11 +1,11 @@
 #!/bin/bash
 # Raycast Script
 # @raycast.schemaVersion 1
-# @raycast.title 粘贴文件到当前目录
+# @raycast.title Paste Files to Current Folder
 # @raycast.mode fullOutput
 # @raycast.icon 📋
 # @raycast.packageName File Operations
-# @raycast.description 将剪贴板中的文件粘贴到 Finder 当前目录
+# @raycast.description Paste clipboard files into the current Finder folder
 source ~/Dev/tools/dev/lib/log_usage.sh
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"

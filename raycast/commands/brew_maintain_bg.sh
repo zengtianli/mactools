@@ -1,10 +1,10 @@
 #!/bin/bash
 # @raycast.schemaVersion 1
-# @raycast.title Maintain Homebrew (后台)
+# @raycast.title Maintain Homebrew (Background)
 # @raycast.mode silent
 # @raycast.icon 🍺
 # @raycast.packageName System
-# @raycast.description 后台静默升级 brew（fire-and-forget），<1s 返回不阻塞 Raycast；日志 ~/Library/Logs/always-latest.log
+# @raycast.description Background silent brew upgrade (fire-and-forget), returns <1s without blocking Raycast; log ~/Library/Logs/always-latest.log
 source ~/Dev/tools/dev/lib/log_usage.sh
 
 LOG="$HOME/Library/Logs/always-latest.log"

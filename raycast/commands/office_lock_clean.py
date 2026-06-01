@@ -4,7 +4,7 @@
 # @raycast.mode fullOutput
 # @raycast.icon 🧹
 # @raycast.packageName File Utils
-# @raycast.description 在所有 Office(Word/Excel/PPT/OneNote/LibreOffice)关闭后,清理残留的 ~$ 锁/属主文件到废纸篓
+# @raycast.description After all Office apps (Word/Excel/PPT/OneNote/LibreOffice) are closed, move leftover ~$ lock/owner files to Trash
 import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 """Office 残留锁文件清理器。
