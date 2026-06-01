@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-# @raycast.schemaVersion 1
-# @raycast.title Maintain Homebrew
-# @raycast.mode fullOutput
-# @raycast.icon 🍺
-# @raycast.packageName System
-# @raycast.description Upgrade formulae + remove orphan casks + upgrade installed casks
+# 引擎(非 Raycast 命令)：2026-06-01 用户钦定 homebrew 只留后台命令 → 本文件降级为引擎,
+# 仅被 brew_maintain_bg.sh 调用(brew_maintain.py --auto)。撤 @raycast.* 元数据,Raycast 不再注册。
 import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 """Homebrew 全量维护：升级 formula + 清理孤儿 cask + 升级在用 cask"""
