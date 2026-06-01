@@ -13,12 +13,10 @@ lib/                # 公共库（display, file_ops, finder, clipboard, env, usa
 ## 脚本清单
 
 **file/**
-- `downloads_organizer.py` - Downloads 按扩展名自动分类（venv shebang，需 yaml）
-- `smart_rename.py` - AI 驱动的文件重命名（venv shebang，需 yaml）
 - `file_copy.py` - Finder 选中文件复制路径/名称
 - `file_print.py` - Finder 选中文件打印
 - `folder_paste.sh` - 粘贴板文件粘贴到当前目录
-- `file_cleanup-downloads.sh` - 三步编排：分类 → 重命名 → 归组
+> Downloads 整理三件套（`downloads_organizer.py` / `smart_rename.py` / `file_cleanup-downloads.sh`）**2026-06-01 退役归档**（归 ~/.Trash）—— 统一由 dev repo 的 content-router（`downloads-router*` + `triage.py`，content-aware + 四层置信门控 + mv 前 HTML 预览）取代。AI 重命名能力如需保留，后续 distill 进 triage.py。
 
 **system/**
 - `sys_app_launcher.py` - 按 `~/Desktop/essential_apps.txt` 启动应用
@@ -29,7 +27,7 @@ lib/                # 公共库（display, file_ops, finder, clipboard, env, usa
 - `sys_oa.sh` - 启动 OA Streamlit
 
 **window/**
-- `yabai.py` - Yabai 窗口管理（float/mouse/org/toggle 子命令）
+- `window_yabai.py` - Yabai 窗口管理（float/mouse/org/toggle 子命令；2026-06-01 由 `yabai.py` 改名补 `window_` 前缀）
 
 ## 引用路径（move 后仍有效，3 层深度未变）
 

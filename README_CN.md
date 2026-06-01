@@ -8,11 +8,11 @@ macOS 日常效率工具集，通过 Raycast 快捷调用。
 
 | 脚本 | 功能 |
 |------|------|
-| `downloads_organizer.py` | Downloads 目录按扩展名自动分类 |
-| `smart_rename.py` | AI 驱动的文件智能重命名 |
 | `file_copy.py` | 复制 Finder 选中的文件 |
 | `file_print.py` | 打印 Finder 选中的文件 |
 | `folder_paste.sh` | 粘贴板文件粘贴到 Finder 当前目录 |
+
+> Downloads 整理三件套（`downloads_organizer.py` / `smart_rename.py` / `file_cleanup-downloads.sh`）2026-06-01 退役，统一由 dev repo content-router 取代。
 
 ## 系统工具 (system/)
 
@@ -27,4 +27,4 @@ macOS 日常效率工具集，通过 Raycast 快捷调用。
 
 | 脚本 | 功能 |
 |------|------|
-| `yabai.py` | Yabai 窗口管理统一工具 |
+| `window_yabai.py` | Yabai 窗口管理统一工具 |

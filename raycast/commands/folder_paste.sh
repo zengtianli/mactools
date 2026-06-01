@@ -1,10 +1,10 @@
 #!/bin/bash
 # Raycast Script
 # @raycast.schemaVersion 1
-# @raycast.title folder_paste
+# @raycast.title 粘贴文件到当前目录
 # @raycast.mode fullOutput
 # @raycast.icon 📋
-# @raycast.packageName Custom
+# @raycast.packageName File Operations
 # @raycast.description 将剪贴板中的文件粘贴到 Finder 当前目录
 source ~/Dev/tools/dev/lib/log_usage.sh
 
