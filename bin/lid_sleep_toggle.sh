@@ -1,15 +1,8 @@
 #!/bin/bash
 
 # Raycast parameters
-# @raycast.schemaVersion 1
-# @raycast.title Toggle Lid Sleep
-# @raycast.mode fullOutput
-# @raycast.icon 💤
-# @raycast.packageName System
 
 # Documentation:
-# @raycast.description Toggle lid sleep (keep Mac awake when lid closed so CC / long tasks keep running). Prints power state, sleep-blocking processes, timeout. Passwordless sudo configured.
-# @raycast.author tianli
 
 source ~/Dev/tools/dev/lib/log_usage.sh
 
