@@ -6,6 +6,10 @@
 
 source ~/Dev/tools/dev/lib/log_usage.sh
 
+# --brief: 机器可读输出（供 Hammerspoon 渲染原生卡片，跳过终端 box-art）
+BRIEF=0
+[ "$1" = "--brief" ] && BRIEF=1
+
 CURRENT=$(pmset -g | awk '/SleepDisabled/ {print $2}')
 [ -z "$CURRENT" ] && CURRENT=0
 
@@ -25,6 +29,16 @@ if ! sudo -n pmset -a disablesleep "$NEW" 2>/dev/null; then
     echo "  EOF"
     echo "  sudo install -m 440 -o root -g wheel /tmp/p.sudoers /etc/sudoers.d/pmset-toggle"
     exit 1
+fi
+
+if [ "$BRIEF" = "1" ]; then
+    BATT=$(pmset -g batt)
+    echo "STATE=$NEW"
+    echo "SRC=$(echo "$BATT" | sed -n "s/.*drawing from '\([^']*\)'.*/\1/p")"
+    echo "PCT=$(echo "$BATT" | grep -oE '[0-9]+%' | head -1)"
+    echo "DISPLAYSLEEP=$(pmset -g | awk '/displaysleep/{print $2}')"
+    echo "SLEEP=$(pmset -g | awk '/^[ \t]*sleep[ \t]/{print $2}')"
+    exit 0
 fi
 
 # ─── Banner ────────────────────────────────────────────────
