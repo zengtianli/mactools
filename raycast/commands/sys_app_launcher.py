@@ -25,12 +25,14 @@ _OPENCLAW_JS = os.path.expanduser(
     "openclaw@2026.3.7_@napi-rs+canvas@0.1.96_@types+express@5.0.6_hono@4.12.5_"
     "node-llama-cpp@3.16.2_typescript@5.9.3_/node_modules/openclaw/dist/index.js"
 )
-# name -> (进程匹配模式用于查重, 启动 argv)。全是 brew formula 的走 `brew services run`。
+# name -> (进程匹配模式用于查重, 启动 argv)。
+# yabai/skhd 来自第三方 tap, `brew services run` 会被拒(untrusted tap), 必须直接跑二进制
+# (配置自动读 ~/.config/{yabai,skhd}/)。长驻二进制用 Popen 脱离, brew services run 用 run。
 SERVICES = {
-    "yabai":     ("yabai",     [BREW, "services", "run", "yabai"]),
-    "skhd":      ("skhd",      [BREW, "services", "run", "skhd"]),
-    "ollama":    ("ollama",    [BREW, "services", "run", "ollama"]),
-    "syncthing": ("syncthing", [BREW, "services", "run", "syncthing"]),
+    "yabai":     ("yabai",     ["/opt/homebrew/bin/yabai"]),
+    "skhd":      ("skhd",      ["/opt/homebrew/bin/skhd"]),
+    "ollama":    ("ollama",    ["/opt/homebrew/bin/ollama", "serve"]),
+    "syncthing": ("syncthing", ["/opt/homebrew/bin/syncthing", "serve", "--no-browser"]),
     "xray":      ("xray",      [BREW, "services", "run", "xray"]),
     "lucarned":  ("lucarned",  [BREW, "services", "run", "lucarned"]),
     "openclaw":  ("openclaw",  [NODE, _OPENCLAW_JS, "gateway", "--port", "18789"]),
@@ -52,11 +54,14 @@ def start_service(name):
         return
     print(f"ℹ️ 启动服务: {name}")
     try:
-        if argv[0] == NODE:  # openclaw: 脱离会话,脚本退出后存活
+        if "services" in argv:  # brew services run: 快速返回,捕获错误
+            r = subprocess.run(argv, capture_output=True, text=True, timeout=30)
+            if r.returncode != 0:
+                print(f"❌ 启动失败 {name}: {(r.stderr or r.stdout).strip().splitlines()[-1:]}")
+                return
+        else:  # 长驻二进制(yabai/skhd/ollama/syncthing/openclaw): Popen 脱离会话存活
             subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              start_new_session=True)
-        else:  # brew services run: 同步返回
-            subprocess.run(argv, capture_output=True, timeout=30)
         print(f"✅ 已启动服务: {name}")
     except Exception as e:
         print(f"❌ 启动失败 {name}: {e}")
