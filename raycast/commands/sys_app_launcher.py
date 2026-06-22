@@ -4,23 +4,67 @@
 # @raycast.mode fullOutput
 # @raycast.icon 🚀
 # @raycast.packageName System
-# @raycast.description Batch-launch apps listed in ~/Desktop/essential_apps.txt
+# @raycast.description 按 ~/Desktop/essential_apps.txt 批量拉起工作环境(GUI app + CLI 服务)
 import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 
 import os
 import re
 import subprocess
+import time
 
 ESSENTIAL_APPS_FILE = os.path.realpath(os.path.expanduser("~/Desktop/essential_apps.txt"))
 RUNNING_APPS_FILE = os.path.realpath(os.path.expanduser("~/Desktop/running_apps.txt"))
+
+# 非 GUI 的 CLI 后台服务 —— 这些登录自启已取消,用本命令按需拉起。
+# 启动方式只「运行」不重新注册开机自启(brew services run / nohup),保持登录极简。
+BREW = "/opt/homebrew/bin/brew"
+NODE = "/opt/homebrew/opt/node/bin/node"
+_OPENCLAW_JS = os.path.expanduser(
+    "~/Library/pnpm/global/5/.pnpm/"
+    "openclaw@2026.3.7_@napi-rs+canvas@0.1.96_@types+express@5.0.6_hono@4.12.5_"
+    "node-llama-cpp@3.16.2_typescript@5.9.3_/node_modules/openclaw/dist/index.js"
+)
+# name -> (进程匹配模式用于查重, 启动 argv)。全是 brew formula 的走 `brew services run`。
+SERVICES = {
+    "yabai":     ("yabai",     [BREW, "services", "run", "yabai"]),
+    "skhd":      ("skhd",      [BREW, "services", "run", "skhd"]),
+    "ollama":    ("ollama",    [BREW, "services", "run", "ollama"]),
+    "syncthing": ("syncthing", [BREW, "services", "run", "syncthing"]),
+    "xray":      ("xray",      [BREW, "services", "run", "xray"]),
+    "lucarned":  ("lucarned",  [BREW, "services", "run", "lucarned"]),
+    "openclaw":  ("openclaw",  [NODE, _OPENCLAW_JS, "gateway", "--port", "18789"]),
+}
+
+
+def is_service_running(pattern):
+    return subprocess.run(["pgrep", "-f", pattern], capture_output=True).returncode == 0
+
+
+def start_service(name):
+    spec = SERVICES.get(name)
+    if not spec:
+        print(f"❌ 未知服务: {name}（可用: {', '.join(SERVICES)}）")
+        return
+    pattern, argv = spec
+    if is_service_running(pattern):
+        print(f"  ✓ 服务已在运行: {name}")
+        return
+    print(f"ℹ️ 启动服务: {name}")
+    try:
+        if argv[0] == NODE:  # openclaw: 脱离会话,脚本退出后存活
+            subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True)
+        else:  # brew services run: 同步返回
+            subprocess.run(argv, capture_output=True, timeout=30)
+        print(f"✅ 已启动服务: {name}")
+    except Exception as e:
+        print(f"❌ 启动失败 {name}: {e}")
 
 
 def get_running_apps():
     """获取当前运行的应用程序列表"""
     print("ℹ️ 正在获取当前运行的应用程序列表...")
-
-    # 方法1: 通过 ps 命令
     result = subprocess.run(["ps", "-eo", "comm"], capture_output=True, text=True)
     apps = set()
     for line in result.stdout.split("\n"):
@@ -28,8 +72,6 @@ def get_running_apps():
             match = re.search(r"/([^/]*\.app)/", line)
             if match:
                 apps.add(match.group(1))
-
-    # 方法2: 通过 AppleScript
     if len(apps) < 5:
         script = """
         tell application "System Events"
@@ -44,108 +86,90 @@ def get_running_apps():
                 if not app_name.endswith(".app"):
                     app_name += ".app"
                 apps.add(app_name)
-
-    # 保存到文件
     with open(RUNNING_APPS_FILE, "w") as f:
         f.write("\n".join(sorted(apps)))
-
     print(f"✅ 已更新运行应用列表 (找到 {len(apps)} 个)")
     return apps
 
 
 def clean_app_name(name):
-    """清理应用名称"""
-    name = re.sub(r" \([^)]*\)$", "", name)  # 移除括号后缀
+    name = re.sub(r" \([^)]*\)$", "", name)
     if not name.endswith(".app"):
         name += ".app"
     return name
 
 
 def launch_app(app_name):
-    """启动应用程序"""
     clean_name = clean_app_name(app_name)
     print(f"ℹ️ 正在启动: {clean_name}")
-
-    # 尝试不同的路径
     paths = [
         f"/Applications/{clean_name}",
         os.path.expanduser(f"~/Applications/{clean_name}"),
         f"/System/Applications/{clean_name}",
     ]
-
     for path in paths:
         if os.path.isdir(path):
-            result = subprocess.run(["open", path], capture_output=True)
-            if result.returncode == 0:
+            if subprocess.run(["open", path], capture_output=True).returncode == 0:
                 print(f"✅ 成功启动: {clean_name}")
                 return True
-
-    # 尝试使用 -a 选项
     app_name_only = clean_name.replace(".app", "")
-    result = subprocess.run(["open", "-a", app_name_only], capture_output=True)
-    if result.returncode == 0:
+    if subprocess.run(["open", "-a", app_name_only], capture_output=True).returncode == 0:
         print(f"✅ 成功启动: {clean_name}")
         return True
-
     print(f"❌ 无法启动应用: {clean_name}")
     return False
 
 
 def main():
     print("=== 应用启动管理器 ===")
-
-    # 检查必需文件
     if not os.path.exists(ESSENTIAL_APPS_FILE):
         print(f"❌ 必需应用列表文件不存在: {ESSENTIAL_APPS_FILE}")
-        print("请创建该文件并添加需要启动的应用名称（每行一个，格式如：App.app）")
+        print("每行一个: GUI app 写 App.app；CLI 服务写 service:<名>（如 service:yabai）")
         return
 
-    # 获取当前运行的应用
-    running_apps = get_running_apps()
-    running_apps_lower = {a.lower() for a in running_apps}
-
-    # 读取必需应用列表
     with open(ESSENTIAL_APPS_FILE) as f:
         lines = f.readlines()
-
     if not lines:
         print("⚠️ 必需应用列表为空")
         return
 
-    apps_to_launch = []
-    apps_already_running = []
-
+    # 先分类: service: 前缀 = CLI 服务; 其余 = GUI app
+    services_to_start, app_lines = [], []
     for line in lines:
         line = line.strip()
-        # 跳过空行和注释
         if not line or line.startswith("#") or line.startswith("==") or line.startswith("--"):
             continue
-
-        clean_name = clean_app_name(line)
-
-        if clean_name.lower() in running_apps_lower:
-            apps_already_running.append(clean_name)
+        if line.lower().startswith("service:"):
+            services_to_start.append(line.split(":", 1)[1].strip().lower())
         else:
-            apps_to_launch.append(clean_name)
+            app_lines.append(line)
 
-    # 显示已运行的应用
+    # ① 启动 CLI 服务
+    if services_to_start:
+        print(f"\n⚙️  CLI 服务 {len(services_to_start)} 个:")
+        for name in services_to_start:
+            start_service(name)
+
+    # ② 启动 GUI app(跳过已运行的)
+    running_apps = get_running_apps()
+    running_apps_lower = {a.lower() for a in running_apps}
+    apps_to_launch, apps_already_running = [], []
+    for line in app_lines:
+        clean_name = clean_app_name(line)
+        (apps_already_running if clean_name.lower() in running_apps_lower else apps_to_launch).append(clean_name)
+
     if apps_already_running:
         print("\nℹ️ 以下应用已在运行：")
         for app in apps_already_running:
             print(f"  ✓ {app}")
-
-    # 启动缺失的应用
     if apps_to_launch:
         print(f"\nℹ️ 需要启动 {len(apps_to_launch)} 个应用")
         for app in apps_to_launch:
             launch_app(app)
-            import time
-
             time.sleep(1)
         print("\n✅ 应用启动完成！")
     else:
         print("\n✅ 所有必需的应用都已在运行！")
-
     print("\n=== 完成 ===")
 
 
