@@ -154,6 +154,20 @@ def main():
     else:
         print("   全部已是最新")
 
+    # 5.5 cleanup 前补升残留 formula
+    # 根因：macOS 27 是 brew 非 Tier-1 配置，开头的 brew update 偶发拉取不全/被限流，
+    # 导致 step 2 的 brew outdated 返回空 → 该升的没升 → cleanup 看到「最新版没装」
+    # 就刷 `Skipping X: most recent version Y not installed` 警告。这里在 cleanup 前
+    # 再核对一次 outdated（此时 DB 已被前面多步刷新），有残留就补一刀，让警告结构上消失。
+    result = subprocess.run(
+        ["brew", "outdated", "--formula", "--quiet"],
+        capture_output=True, text=True, timeout=120,
+    )
+    leftover = [x for x in result.stdout.strip().split("\n") if x]
+    if leftover:
+        print(f"\n🔁 cleanup 前补升残留 formula（{len(leftover)}个）：{', '.join(leftover)}")
+        subprocess.run(["brew", "upgrade", "--formula"])
+
     # 6. cleanup
     print("\n🧹 清理缓存...")
     subprocess.run(["brew", "cleanup", "--prune=7"], timeout=60)
