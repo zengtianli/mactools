@@ -1,6 +1,6 @@
 # mactools
 
-> 📋 会话回顾：handoffs/sessions-recap.md（1 会话 merge,截至 2026-06-26;/start 从此接最新进度,源会话已退役）
+> 📋 会话回顾：handoffs/sessions-recap.md（3 会话 merge,截至 2026-07-01;/start 从此接最新进度,源会话已退役）
 
 macOS 日常效率工具集，从 scripts 仓库拆分。主要通过 Raycast 调用。
 
