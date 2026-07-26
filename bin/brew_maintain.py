@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # 引擎(非 Raycast 命令)：2026-06-01 用户钦定 homebrew 只留后台命令 → 本文件降级为引擎,
 # 仅被 brew_maintain_bg.sh 调用(brew_maintain.py --auto)。撤 @raycast.* 元数据,Raycast 不再注册。
+# 2026-07-26: 全程非交互化 —— 默认不再问任何 y(卸载孤儿 cask 直接干),brew 子进程带
+# NONINTERACTIVE=1 + stdin=DEVNULL。--auto 变 no-op(兼容旧调用),--ask 才恢复交互确认。
 import sys, os; sys.path.insert(0, os.path.expanduser("~/Dev/tools/dev/lib"))
 import log_usage  # noqa: F401  (import 即埋点)
 """Homebrew 全量维护：升级 formula + 清理孤儿 cask + 升级在用 cask"""
@@ -13,10 +15,30 @@ import time
 
 EXCLUDE = {"claude", "typora"}
 
+# 全程非交互：脚本自身不问 y（默认 = 干活），brew 子进程也别弹提示。
+# HOMEBREW_NO_ASK=1 是关键那把——brew ≥4 的 "ask 模式"默认开启（cmd/upgrade.rb:
+#   `ask = !args.no_ask?`），会先跑一遍 dry-run 预览再问 "Do you want to proceed?"，
+#   这就是用户抱怨的第二个 y；NONINTERACTIVE 管不到它，必须单独关。顺带省掉预览那趟空跑。
+# NONINTERACTIVE=1 关 brew 其余交互；NO_ENV_HINTS 去噪。
+BREW_ENV = {
+    **os.environ,
+    "HOMEBREW_NO_ASK": "1",
+    "NONINTERACTIVE": "1",
+    "HOMEBREW_NO_ENV_HINTS": "1",
+}
+
+
+def run(cmd, **kw):
+    """所有 brew 调用统一走这里：注入非交互环境 + 掐掉 stdin 防挂起"""
+    kw.setdefault("env", BREW_ENV)
+    if not kw.get("capture_output"):
+        kw.setdefault("stdin", subprocess.DEVNULL)
+    return subprocess.run(cmd, **kw)
+
 
 def get_cask_app_map():
     """批量获取所有已安装 cask 及其 .app 路径"""
-    result = subprocess.run(
+    result = run(
         ["brew", "info", "--json=v2", "--installed"],
         capture_output=True, text=True, timeout=120,
     )
@@ -45,25 +67,27 @@ def check_app_exists(app_name):
 
 
 def main():
-    auto = "--auto" in sys.argv
+    # 默认全自动（不问 y）。--auto 保留兼容（已是默认，等价 no-op）；
+    # --ask 才恢复卸载孤儿前的交互确认。
+    ask = "--ask" in sys.argv
 
     print("🍺 Homebrew 全量维护")
     print("=" * 50)
 
     # 1. brew update
     print("\n📡 更新 Homebrew 索引...")
-    subprocess.run(["brew", "update"], timeout=300)
+    run(["brew", "update"], timeout=300)
 
     # 2. 升级 formula
     print("\n📦 检查 formula 更新...")
-    result = subprocess.run(
+    result = run(
         ["brew", "outdated", "--formula"],
         capture_output=True, text=True, timeout=120,
     )
     outdated_formulae = result.stdout.strip().split("\n") if result.stdout.strip() else []
     if outdated_formulae:
         print(f"   需升级：{', '.join(outdated_formulae)}")
-        subprocess.run(["brew", "upgrade", "--formula"])
+        run(["brew", "upgrade", "--formula"])
         print("✅ Formula 升级完成")
     else:
         print("   全部已是最新")
@@ -91,16 +115,16 @@ def main():
         for token, apps in orphans:
             print(f"   {token:30s}  {', '.join(apps)}")
 
-        if auto:
-            do_remove = True
-        else:
+        if ask:
             ans = input(f"\n卸载这 {len(orphans)} 个？[Y/n] ").strip().lower()
             do_remove = ans in ("", "y", "yes")
+        else:
+            do_remove = True  # 默认 = 卸载（cask 可随时 brew install 装回）
 
         if do_remove:
             tokens = [t for t, _ in orphans]
             print(f"\n正在卸载 {len(tokens)} 个 cask...")
-            subprocess.run(["brew", "uninstall", "--cask"] + tokens)
+            run(["brew", "uninstall", "--cask"] + tokens)
             print("✅ 孤儿清理完成")
         else:
             print("⏭️  跳过卸载")
@@ -110,7 +134,7 @@ def main():
     # 5. 升级在用 cask（含 non-app cask 如 CLI 工具、字体等）
     upgradable = active + non_app
     print(f"\n⬆️  检查 {len(upgradable)} 个在用 cask 的更新（含 {len(non_app)} 个 non-app）...")
-    result = subprocess.run(
+    result = run(
         ["brew", "outdated", "--cask", "--greedy"],
         capture_output=True, text=True, timeout=120,
     )
@@ -128,7 +152,7 @@ def main():
             print(f"\n   [{i}/{len(to_upgrade)}] {token}...", flush=True)
             t0 = time.time()
             try:
-                r = subprocess.run(
+                r = run(
                     ["brew", "upgrade", "--cask", token],
                     timeout=cask_timeout,
                 )
@@ -159,18 +183,18 @@ def main():
     # 导致 step 2 的 brew outdated 返回空 → 该升的没升 → cleanup 看到「最新版没装」
     # 就刷 `Skipping X: most recent version Y not installed` 警告。这里在 cleanup 前
     # 再核对一次 outdated（此时 DB 已被前面多步刷新），有残留就补一刀，让警告结构上消失。
-    result = subprocess.run(
+    result = run(
         ["brew", "outdated", "--formula", "--quiet"],
         capture_output=True, text=True, timeout=120,
     )
     leftover = [x for x in result.stdout.strip().split("\n") if x]
     if leftover:
         print(f"\n🔁 cleanup 前补升残留 formula（{len(leftover)}个）：{', '.join(leftover)}")
-        subprocess.run(["brew", "upgrade", "--formula"])
+        run(["brew", "upgrade", "--formula"])
 
     # 6. cleanup
     print("\n🧹 清理缓存...")
-    subprocess.run(["brew", "cleanup", "--prune=7"], timeout=60)
+    run(["brew", "cleanup", "--prune=7"], timeout=60)
     print("\n✅ 维护完成")
 
 
