@@ -28,11 +28,18 @@ BREW_ENV = {
 }
 
 
+# 交互式跑（终端里）→ 继承 stdin，让少数需要 root 的 cask（如 quarto 卸旧版 pkg）
+# 能弹 sudo 密码框；无人值守跑（cron / nohup / 管道）→ DEVNULL，宁可失败也别静默挂死。
+# 踩坑 2026-07-26：一刀切 DEVNULL 导致 quarto 升级 `Error: quarto: Broken pipe`
+# ——sudo 想要密码却没有输入通道。密码 ≠ y/n 确认，前者省不掉，后者才是要消灭的。
+_TTY = sys.stdin.isatty()
+
+
 def run(cmd, **kw):
-    """所有 brew 调用统一走这里：注入非交互环境 + 掐掉 stdin 防挂起"""
+    """所有 brew 调用统一走这里：注入非交互环境 + 按 tty 决定 stdin"""
     kw.setdefault("env", BREW_ENV)
     if not kw.get("capture_output"):
-        kw.setdefault("stdin", subprocess.DEVNULL)
+        kw.setdefault("stdin", None if _TTY else subprocess.DEVNULL)
     return subprocess.run(cmd, **kw)
 
 
