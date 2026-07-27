@@ -1,30 +1,26 @@
-**中文** | [English](README.md)
-
 # mactools
 
-macOS 日常效率工具集，通过 Raycast 快捷调用。
+macOS 本机小工具。**目录结构以磁盘为准,下表 2026-07-27 按实测重写**
+(此前列的 9 个脚本里 5 个已在 `raycast/_archive/`、2 个根本不存在)。
 
-## 文件操作 (file/)
-
-| 脚本 | 功能 |
-|------|------|
-| `file_copy.py` | 复制 Finder 选中的文件 |
-| `file_print.py` | 打印 Finder 选中的文件 |
-| `folder_paste.sh` | 粘贴板文件粘贴到 Finder 当前目录 |
-
-> Downloads 整理三件套（`downloads_organizer.py` / `smart_rename.py` / `file_cleanup-downloads.sh`）2026-06-01 退役，统一由 dev repo content-router 取代。
-
-## 系统工具 (system/)
+## 在册 Raycast 命令 (`raycast/commands/`)
 
 | 脚本 | 功能 |
 |------|------|
-| `sys_app_launcher.py` | 应用启动器 |
-| `display_1080.sh` | 切换 1080p 分辨率 |
-| `display_4k.sh` | 切换 4K 分辨率 |
 | `create_reminder.sh` | 创建 Apple 提醒事项 |
+| `sys_app_launcher.py` | 应用启动器 |
+| `mem_hog.sh` | 列内存占用大户(薄壳,引擎在 `bin/mem_hog.py`) |
 
-## 窗口管理 (window/)
+## 命令行工具 (`bin/`)
 
 | 脚本 | 功能 |
 |------|------|
-| `window_yabai.py` | Yabai 窗口管理统一工具 |
+| `brew_maintain.py` | Homebrew 维护(update/upgrade/cleanup/doctor) |
+| `lid_sleep_toggle.sh` | 合盖不休眠开关 |
+| `mem_hog.py` | 内存占用排行引擎 |
+
+## 已归档 (`raycast/_archive/`,不装机)
+
+`file_copy.py` · `file_print.py` · `folder_paste.sh` · `dingtalk_gov.sh` · `window_yabai.py`
+—— 想恢复就 mv 回 `raycast/commands/`。
+(`display_1080.sh` / `display_4k.sh` 在任何位置都不存在,已从清单删除。)

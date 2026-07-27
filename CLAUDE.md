@@ -12,26 +12,27 @@ lib/                # 公共库（display, file_ops, finder, clipboard, env, usa
 # venv 共享在 ~/Dev/.venv（uv workspace member · 见 ~/Dev/CLAUDE.md）
 ```
 
-## 脚本清单
+## 脚本清单（2026-07-27 按磁盘实测重写）
 
-**file/**
-- `file_copy.py` - Finder 选中文件复制路径/名称
-- `file_print.py` - Finder 选中文件打印
-- `folder_paste.sh` - 粘贴板文件粘贴到当前目录
-> Downloads 整理三件套（`downloads_organizer.py` / `smart_rename.py` / `file_cleanup-downloads.sh`）**2026-06-01 退役归档**（归 ~/.Trash）—— 统一由 dev repo 的 content-router（`downloads-router*` + `triage.py`，content-aware + 四层置信门控 + mv 前 HTML 预览）取代。AI 重命名能力如需保留，后续 distill 进 triage.py。
+> 此前这一节列的 file/ system/ window/ 三组共 11 个脚本里,**5 个已在 `raycast/_archive/`**、
+> **2 个(`display_1080.sh` / `display_4k.sh`)在任何位置都不存在**。清单以磁盘为准。
 
-**system/**
-- `sys_app_launcher.py` - 按 `~/Desktop/essential_apps.txt` 启动应用
-- `brew_maintain.py` - Homebrew 全量维护
-- `display_1080.sh` / `display_4k.sh` - 显示器分辨率切换
-- `dingtalk_gov.sh` - 政务钉钉启动
-- `create_reminder.sh` - Apple 提醒事项创建
-- `sys_oa.sh` - 启动 OA Streamlit
+**`raycast/commands/`（在册,Raycast 扫描面）**
+- `create_reminder.sh` — Apple 提醒事项创建
+- `sys_app_launcher.py` — 按 `~/Desktop/essential_apps.txt` 启动应用
+- `mem_hog.sh` — 内存占用大户(薄壳 → `bin/mem_hog.py`)
 
-**window/**
-- `window_yabai.py` - Yabai 窗口管理（float/mouse/org/toggle 子命令；2026-06-01 由 `yabai.py` 改名补 `window_` 前缀）
+**`bin/`（命令行,不进 Raycast）**
+- `brew_maintain.py` — Homebrew 全量维护
+- `lid_sleep_toggle.sh` — 合盖不休眠开关
+- `mem_hog.py` — 内存占用排行引擎
 
-## 引用路径（move 后仍有效，3 层深度未变）
+**`raycast/_archive/`（不装机;想恢复 mv 回 commands/）**
+- `file_copy.py` · `file_print.py` · `folder_paste.sh` · `dingtalk_gov.sh` · `window_yabai.py`
+
+> Downloads 整理三件套已迁出本仓 → `~/Dev/tools/dev/lib/tools/downloads_triage/`(挂 launchd
+> `com.tianli.downloads-router`)。
+
 
 - Shell: `source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"`
 - Python: `sys.path.insert(0, str(Path(__file__).parent.parent.parent / "lib"))`
