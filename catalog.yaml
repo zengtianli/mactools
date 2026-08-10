@@ -8,3 +8,7 @@ depends_on: [dev-corelib, dockit, mailroom, llm-client, photo-app, doctools]
 tier: CORE
 owner: tianli
 docs: ./README.md
+
+# 运行时表面(2026-08-10 应用注册表立;对账: app_registry.py audit)
+surfaces:
+  - {type: launchd, id: com.tianli.always-latest}
