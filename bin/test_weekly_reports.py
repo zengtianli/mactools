@@ -10,6 +10,33 @@ import weekly_reports as w
 
 
 class PeriodTests(unittest.TestCase):
+    def test_monthly_waits_until_second_at_eight(self):
+        start, end = w.period(dt.datetime.fromisoformat('2026-09-02T07:59:59-07:00'), 'monthly')
+        self.assertEqual((str(start.date()),str(end.date())),('2026-07-01','2026-08-01'))
+        start, end = w.period(dt.datetime.fromisoformat('2026-09-02T08:00:00-07:00'), 'monthly')
+        self.assertEqual((str(start.date()),str(end.date())),('2026-08-01','2026-09-01'))
+
+    def test_monthly_year_leap_and_dst(self):
+        start,end = w.period(dt.datetime.fromisoformat('2027-01-02T08:00:00-08:00'),'monthly')
+        self.assertEqual(str(start.date()),'2026-12-01')
+        start,end = w.period(dt.datetime.fromisoformat('2024-03-02T08:00:00-08:00'),'monthly')
+        self.assertEqual((end-start).days,29)
+        start,end = w.period(dt.datetime.fromisoformat('2026-04-02T08:00:00-07:00'),'monthly')
+        self.assertEqual((end.timestamp()-start.timestamp())/3600,31*24-1)
+
+    def test_monthly_archive_isolated(self):
+        start,end = w.period(dt.datetime.fromisoformat('2026-09-02T08:00:00-07:00'),'monthly')
+        self.assertEqual(w.archive(start,end,'monthly'),w.ROOT/'monthly/2026-08')
+
+    def test_monthly_sample_includes_early_and_late(self):
+        result = w.spread(list(range(1000)),40)
+        self.assertEqual((result[0],result[-1]),(0,999))
+        self.assertEqual(len(set(result)),40)
+
+    def test_monthly_reject_current_month(self):
+        with self.assertRaises(SystemExit):
+            w.main(['--frequency','monthly','--period',dt.datetime.now(w.PT).strftime('%Y-%m'),'--check'])
+
     def test_before_sunday_boundary(self):
         start, end = w.period(dt.datetime.fromisoformat('2026-09-06T07:59:59-07:00'))
         self.assertEqual(end.isoformat(), '2026-08-30T08:00:00-07:00')

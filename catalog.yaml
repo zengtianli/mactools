@@ -13,5 +13,6 @@ docs: ./README.md
 surfaces:
   - {type: launchd, id: com.tianli.always-latest}
   - {type: launchd, id: com.tianli.weekly-reports}
+  - {type: launchd, id: com.tianli.monthly-reports}
   - {type: launchd, id: com.tianli.client-due}
 lifecycle: active   # 2026-08-10 lint 补标(有 live 表面/显式 form 必带 lifecycle)

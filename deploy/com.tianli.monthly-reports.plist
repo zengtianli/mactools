@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.tianli.monthly-reports</string>
+<key>ProgramArguments</key><array><string>/bin/bash</string><string>/Users/tianli/Dev/tools/mactools/bin/weekly_reports.sh</string><string>--frequency</string><string>monthly</string></array>
+<key>EnvironmentVariables</key><dict><key>PATH</key><string>/opt/homebrew/bin:/Users/tianli/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string><key>HOME</key><string>/Users/tianli</string></dict>
+<key>StartCalendarInterval</key><dict><key>Minute</key><integer>0</integer></dict>
+<key>RunAtLoad</key><true/>
+<key>ProcessType</key><string>Background</string>
+<key>StandardOutPath</key><string>/Users/tianli/Library/Logs/monthly-reports.log</string>
+<key>StandardErrorPath</key><string>/Users/tianli/Library/Logs/monthly-reports.err</string>
+</dict></plist>
