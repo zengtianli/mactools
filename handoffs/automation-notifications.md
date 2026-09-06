@@ -18,7 +18,10 @@
 - 共享通知去重、发送拒绝、暂缓、不再提醒、新事件重置已通过真实函数替身测试。
 - 案件/学术 dry-run 已运行：当前案件1项待核回执，学术0项。
 - 真实软件升级正在执行，最终结果待本轮回填。
-- 真实通知点击的 UI 验收进行中；不能以发送回执替代点击验证。
+- 真实发送、通知列表送达记录、相同案件的第二次运行去重均已验证；生产 `--interact` 与 `--action open` 详情处理路径实际退出0。尚未完成亲手点横幅的端到端 UI 验收：CUA 在软件更新过程中出现 `Sky Computer Use native pipe startup failed`，重置后仍失败。没有把命令成功当作完整 UI 点击验收。
+- 5项共享通知回归测试通过；案件口述已交邮/未递交/已完成三个对照通过。TestFlight真实检查全绿、没有触发构建上传。
+- 所有相关代码已分别提交推送到 mactools、devtools、personal-kb、ip-legal、qinglong；原8项后台触发器保持停用，5个保留入口均已加载。
+- module-map 已从 catalog 重建到 `~/Library/Application Support/AutomationUpdates/module-map.json`，83个包、177条边；共享入口已登记总部 `hq_capabilities.yaml`。
 
 运行状态：`~/Library/Application Support/TaskNotifications/`；更新日志：`~/Library/Application Support/AutomationUpdates/`。
 前轮停用的8项后台触发器继续禁用；配置归档见 `~/Library/Application Support/AutomationArchive/20260906-064836/`。
