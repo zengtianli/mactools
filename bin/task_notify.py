@@ -119,8 +119,9 @@ end run'''
             print('重复提醒已抑制:', a.key)
             return 0
         command = shlex.join([sys.executable, str(Path(__file__).resolve()), '--key', a.key, '--interact'])
+        subtitle = '点击阅读全文' if a.open_only and a.url else '点击查看详情与提醒选项'
         try:
-            r = subprocess.run([NOTIFIER, '-title', a.title, '-message', a.message, '-subtitle', '点击查看详情与提醒选项', '-group', group, '-execute', command], capture_output=True, text=True, timeout=60)
+            r = subprocess.run([NOTIFIER, '-title', a.title, '-message', a.message, '-subtitle', subtitle, '-group', group, '-execute', command], capture_output=True, text=True, timeout=60)
         except subprocess.TimeoutExpired:
             print('通知工具超时；详情已保存：' + str(detail), file=sys.stderr)
             return 1

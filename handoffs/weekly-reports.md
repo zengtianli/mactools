@@ -28,3 +28,13 @@
 调度/通知/客户过滤26项、总部Codex纯文本4项、每日生成器/调度16项测试通过。三份周报逐条对照原始记录，数字一致；封面与正文图目视检查无裁切。首期各阶段状态见 /Users/tianli/Library/Application Support/WeeklyReports/2026-09-06/*/state.json。
 
 私密阅读总目录：https://tianli.cyou/private/blog/ 。
+
+## 首期验收结果
+
+2026-09-06 三份首期已完成真实生成、发布、源站正文/封面核验与通知发送。每个 kind 的 complete/notified 均为true。开发与水利的匿名边缘访问保护已核验，投资同样通过保护检查；未实际操作系统通知横幅点击，点击分支已有自动化测试，通知工具实际发送成功。
+
+- 开发：https://blog.tianli.cyou/private-view/weekly-development-2026-09-06
+- 水利：https://blog.tianli.cyou/private-view/weekly-water-2026-09-06
+- 投资：https://blog-options.tianli.cyou/private-view/weekly-investment-2026-09-06
+
+投资两图直接消费现有scoreboard的TWR/QQQ逐日收益与结算后buffer，所用5行字段快照在该文图片目录weekly-scoreboard.json；独立核验与原账本完全一致。下一期周报2026-09-13 08:00 PT；每日投资下一次触发2026-09-08 14:00 PT（Labor Day休市后）。两条新LaunchAgent已加载，实跑退出0。
