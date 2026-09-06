@@ -66,6 +66,13 @@ class Notifications(unittest.TestCase):
         self.assertEqual(stable('🔴 剩 3 天 · A（2026-09-09）'), stable('🔴 剩 2 天 · A（2026-09-09）'))
         self.assertNotEqual(stable('🔴 剩 3 天 · A（2026-09-09）'), stable('🔴 剩 3 天 · A（2026-10-09）'))
 
+    def test_article_notification_opens_only_the_article(self):
+        with patch.object(notify.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '', '')) as run:
+            notify.main(self.args + ['--url', 'https://example.com/article', '--open-only'])
+            run.reset_mock()
+            notify.main(['--key', 'test', '--interact'])
+            run.assert_called_once_with(['/usr/bin/open', 'https://example.com/article'], check=True)
+
 
 if __name__ == '__main__':
     unittest.main()

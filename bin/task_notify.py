@@ -44,6 +44,7 @@ def main(argv=None):
     p.add_argument('--message', default='点击查看详情')
     p.add_argument('--details', type=Path)
     p.add_argument('--url')
+    p.add_argument('--open-only', action='store_true', help='Click opens URL directly, without a local dialog')
     p.add_argument('--fingerprint', help='Stable event identity; omit volatile dates/countdowns')
     p.add_argument('--repeat-hours', type=float, default=168)
     p.add_argument('--clear', action='store_true')
@@ -56,6 +57,9 @@ def main(argv=None):
     if a.interact or a.action:
         old = json.loads(state.read_text())
         action = a.action
+        if old.get('open_only') and old.get('url') and action in (None, 'open'):
+            subprocess.run(['/usr/bin/open', old['url']], check=True)
+            return 0
         if action in (None, 'open'):
             subprocess.run(['/usr/bin/open', '-a', 'TextEdit', str(detail)], check=True)
             if old.get('url'):
@@ -104,7 +108,7 @@ end run'''
         fingerprint = a.fingerprint or hashlib.sha256((a.title + '\n' + a.message).encode()).hexdigest()
         now = time.time()
         data = dict(old) if old.get('fingerprint') == fingerprint else {}
-        data.update(key=a.key, title=a.title, message=a.message, fingerprint=fingerprint, url=a.url)
+        data.update(key=a.key, title=a.title, message=a.message, fingerprint=fingerprint, url=a.url, open_only=a.open_only)
         if a.dry_run:
             print(json.dumps({'key': a.key, 'send': eligible(old, fingerprint, now, a.repeat_hours), 'title': a.title, 'message': a.message}, ensure_ascii=False))
             return 0
