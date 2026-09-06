@@ -83,6 +83,8 @@ end run'''
                 current['dismissed'] = True
             elif action == 'snooze':
                 current['snoozed_until'] = time.time() + 86400
+            current['last_action'] = action or 'keep'
+            current['interacted_at'] = time.time()
             save(state, current)
         return 0
     with (ROOT / 'state.lock').open('a') as lock:

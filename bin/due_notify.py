@@ -33,6 +33,7 @@ def main():
     body = r.stdout + r.stderr
     report = home / 'Library/Logs' / (a.source + '-due-details.txt')
     report.write_text(body)
+    report.chmod(0o600)
     lines = [line.strip() for line in r.stdout.splitlines() if '🔴' in line or '🟡' in line]
     common = ['--dry-run'] if a.dry_run else []
     keys = set()
