@@ -25,7 +25,7 @@ def main():
         cmd = ['/opt/homebrew/bin/python3', str(home / 'Dev/tools/kb/bin/acad.py'), 'due', '--days', a.days]
         title = '学术事项'
     else:
-        cmd = ['/opt/homebrew/bin/python3', str(home / 'Archives/ip-legal/.tools/cases_due.py'), '--days', a.days]
+        cmd = ['/opt/homebrew/bin/python3', str(home / 'Archives/ip-legal/.tools/cases_due.py'), '--days', a.days, '--details']
         title = '案件事项'
         if a.today:
             cmd += ['--today', a.today]
@@ -34,7 +34,7 @@ def main():
     report = home / 'Library/Logs' / (a.source + '-due-details.txt')
     report.write_text(body)
     report.chmod(0o600)
-    lines = [line.strip() for line in r.stdout.splitlines() if '🔴' in line or '🟡' in line]
+    lines = [line.strip() for line in r.stdout.splitlines() if line.lstrip().startswith(('🔴', '🟡'))]
     common = ['--dry-run'] if a.dry_run else []
     keys = set()
     result = 0
