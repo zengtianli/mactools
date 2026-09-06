@@ -81,14 +81,20 @@ def maintain():
         else:
             failures.append('未找到 npm 更新程序')
         log.flush()
-    failed_casks = re.findall(r'^\s+([a-z0-9@.+-]+): (?:安装失败|超时)', log_path.read_text(), re.MULTILINE)
+    log_text = log_path.read_text()
+    failed_casks = re.findall(r'^\s+([a-z0-9@.+-]+): (?:安装失败|超时)', log_text, re.MULTILINE)
+    aliases = {'dingtalk': '钉钉', 'temurin': 'Java（Temurin）', 'tencent-meeting': '腾讯会议'}
+    names = [aliases.get(name, name) for name in failed_casks]
     if failed_casks and 'Homebrew 更新未完成' in failures:
-        failures[failures.index('Homebrew 更新未完成')] += '（' + '、'.join(failed_casks) + '）'
+        failures[failures.index('Homebrew 更新未完成')] += '：' + '、'.join(names)
+        if 'sudo: a password is required' in log_text:
+            failures[0] += '；安装需要管理员密码'
+    failure_count = len(failures) + max(0, len(failed_casks) - 1)
     notify = [sys.executable, str(BIN / 'task_notify.py'), '--key', 'software-updates']
     if failures:
         details = STATE / 'latest-failure.txt'
         details.write_text('软件更新未全部完成\n\n' + '\n'.join(failures) + '\n\n完整日志：\n' + log_path.read_text())
-        notify += ['--title', f'软件更新有 {len(failures)} 项未完成', '--message', '；'.join(failures) + '。点击查看详情。', '--details', str(details)]
+        notify += ['--title', f'软件更新有 {failure_count} 项未完成', '--message', '；'.join(failures) + '。点击查看详情。', '--details', str(details)]
     else:
         notify += ['--clear']
     result = subprocess.run(notify, stdin=subprocess.DEVNULL)
