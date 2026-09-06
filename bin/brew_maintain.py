@@ -215,5 +215,8 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError) as exc:
+        for output in (getattr(exc, "stdout", None), getattr(exc, "stderr", None)):
+            if output:
+                print(output, file=sys.stderr, flush=True)
         print(f"Homebrew 维护失败：{exc}", file=sys.stderr, flush=True)
         sys.exit(1)
