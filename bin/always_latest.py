@@ -81,6 +81,9 @@ def maintain():
         else:
             failures.append('未找到 npm 更新程序')
         log.flush()
+    failed_casks = re.findall(r'^\s+([a-z0-9@.+-]+): (?:安装失败|超时)', log_path.read_text(), re.MULTILINE)
+    if failed_casks and 'Homebrew 更新未完成' in failures:
+        failures[failures.index('Homebrew 更新未完成')] += '（' + '、'.join(failed_casks) + '）'
     notify = [sys.executable, str(BIN / 'task_notify.py'), '--key', 'software-updates']
     if failures:
         details = STATE / 'latest-failure.txt'
