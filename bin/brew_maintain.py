@@ -37,6 +37,7 @@ _TTY = sys.stdin.isatty()
 
 def run(cmd, **kw):
     """所有 brew 调用统一走这里：注入非交互环境 + 按 tty 决定 stdin"""
+    kw.setdefault("check", True)
     kw.setdefault("env", BREW_ENV)
     if not kw.get("capture_output"):
         kw.setdefault("stdin", None if _TTY else subprocess.DEVNULL)
@@ -74,6 +75,7 @@ def check_app_exists(app_name):
 
 
 def main():
+    failed = []
     # 默认全自动（不问 y）。--auto 保留兼容（已是默认，等价 no-op）；
     # --ask 才恢复卸载孤儿前的交互确认。
     ask = "--ask" in sys.argv
@@ -161,7 +163,7 @@ def main():
             try:
                 r = run(
                     ["brew", "upgrade", "--cask", token],
-                    timeout=cask_timeout,
+                    timeout=cask_timeout, check=False,
                 )
                 elapsed = time.time() - t0
                 if r.returncode != 0:
@@ -202,8 +204,16 @@ def main():
     # 6. cleanup
     print("\n🧹 清理缓存...")
     run(["brew", "cleanup", "--prune=7"], timeout=60)
+    if failed:
+        print("\n⚠️ 维护结束，存在未完成更新", flush=True)
+        return 1
     print("\n✅ 维护完成")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        sys.exit(main())
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError) as exc:
+        print(f"Homebrew 维护失败：{exc}", file=sys.stderr, flush=True)
+        sys.exit(1)
