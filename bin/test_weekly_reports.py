@@ -10,6 +10,13 @@ import weekly_reports as w
 
 
 class PeriodTests(unittest.TestCase):
+    def test_monthly_sampling_preserves_final_corrections(self):
+        result=w.monthly_sample(list(range(100)))
+        self.assertEqual(len(result),40)
+        self.assertEqual(result[-20:],list(range(80,100)))
+        self.assertEqual(result[0],0)
+        self.assertEqual(len(set(result)),40)
+
     def test_monthly_waits_until_second_at_eight(self):
         start, end = w.period(dt.datetime.fromisoformat('2026-09-02T07:59:59-07:00'), 'monthly')
         self.assertEqual((str(start.date()),str(end.date())),('2026-07-01','2026-08-01'))

@@ -23,6 +23,7 @@ HQ = HOME / 'Dev/tools/dev/lib/tools/cc'
 ROOT = HOME / 'Library/Application Support/WeeklyReports'
 PT = ZoneInfo('America/Los_Angeles')
 KINDS = {'development': '开发周报', 'water': '水利周报', 'investment': '投资周报'}
+MONTHLY_RECENT_RECORDS = 20
 sys.path.insert(0, str(HQ))
 import blog_paths as bp
 import blog_publish
@@ -64,6 +65,14 @@ def spread(rows, limit):
     if len(rows) <= limit:
         return rows
     return [rows[round(i * (len(rows)-1) / (limit-1))] for i in range(limit)]
+
+
+def monthly_sample(rows, limit=40):
+    """Keep month-end corrections alongside evenly sampled earlier work."""
+    if len(rows) <= limit:
+        return rows
+    recent = min(MONTHLY_RECENT_RECORDS, limit-2)
+    return spread(rows[:-recent], limit-recent) + rows[-recent:]
 
 
 def git(repo, *args):
@@ -114,7 +123,7 @@ def collect(kind, start, end, frequency='weekly'):
             except ValueError:
                 continue
             if start.date() <= day < end.date():
-                records.append({'id': f'post:{slug}', 'title': str(fm.get('title', slug)), 'text': raw if frequency == 'monthly' else raw[:14000],
+                records.append({'id': f'post:{slug}', 'title': str(fm.get('title', slug)), 'text': raw,
                                 'source': post.url, 'group': '逐日投资复盘', 'date': str(day)})
         coverage['scanned'] = ['blog_paths:options']
         # Missing daily reviews are disclosed as a source gap, never invented.
@@ -151,8 +160,8 @@ def collect(kind, start, end, frequency='weekly'):
                 limit = 40 if frequency == 'monthly' else 16
                 if len(rows) > limit:
                     coverage['truncated'].append({'repo': str(repo), 'observed_up_to': len(rows), 'included': limit,
-                                                 'selection': 'across_full_month' if frequency == 'monthly' else 'most_recent'})
-                selected = spread(sorted(rows, key=lambda r: r[1]), limit) if frequency == 'monthly' else rows[:limit]
+                                                 'selection': f'full_month_plus_latest_{MONTHLY_RECENT_RECORDS}' if frequency == 'monthly' else 'most_recent'})
+                selected = monthly_sample(sorted(rows, key=lambda r: r[1]), limit) if frequency == 'monthly' else rows[:limit]
                 for sha, stamp, subject, body in selected:
                     names = git(repo, 'show', '--format=', '--name-only', sha).splitlines()
                     text = subject + '\n' + body[:2400] + '\n变更文件：\n' + '\n'.join(names[:20])
@@ -258,11 +267,12 @@ def execute(kind, start, end, retry=False, frequency='weekly'):
         # Scope and gaps are deterministic, not entrusted to a generated summary.
         raw = post.zh_md.read_text()
         if '本期取材' not in raw:
-            raw += '\n\n本期取材：'+start.strftime('%Y-%m-%d %H:%M')+' 至 '+end.strftime('%Y-%m-%d %H:%M')+'（美西时间，不含终点）。只反映留有记录的工作；提交不等于交付或验收。\n'
-            method = '每仓最多取最近 16 条。' if frequency == 'weekly' else '每仓最多沿整月时间跨度均匀选取 40 条；摘要按项目及月内周段轮转取材，最多 160 条，不是全部工作清单。'
-            raw += f"\n本期纳入 {len(data['records'])} 条证据。" + (method if kind != 'investment' else '投资总结来自本期逐日复盘。') + '完整来源与覆盖明细保存在本机本期归档。后续建议反映这些记录中的状态，之后的更新不在本期范围内。\n'
+            scope = '\n\n本期取材：'+start.strftime('%Y-%m-%d %H:%M')+' 至 '+end.strftime('%Y-%m-%d %H:%M')+'（美西时间，不含终点）。只反映留有记录的工作；提交不等于交付或验收。\n'
+            method = '每仓最多取最近 16 条。' if frequency == 'weekly' else f'每仓最多选取 40 条，保留最新 {MONTHLY_RECENT_RECORDS} 条并沿此前整月均匀取材；摘要按项目及月内周段轮转取材，最多 320 条，不是全部工作清单。'
+            scope += f"\n本期纳入 {len(data['records'])} 条证据。" + (method if kind != 'investment' else '投资总结来自本期逐日复盘。') + '完整来源与覆盖明细保存在本机本期归档。后续建议反映这些记录中的状态，之后的更新不在本期范围内。\n'
             if data['coverage']['unavailable']:
-                raw += f"\n取材缺口：{len(data['coverage']['unavailable'])} 项来源未能读取；本期结论不覆盖这些缺口。\n"
+                scope += f"\n取材缺口：{len(data['coverage']['unavailable'])} 项来源未能读取；本期结论不覆盖这些缺口。\n"
+            raw = raw.replace('</details>', scope+'\n</details>', 1) if '</details>' in raw else raw+scope
             post.zh_md.write_text(raw)
         state['stage'] = '检查与发布私密博客'
         save(path, state)
