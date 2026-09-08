@@ -64,7 +64,7 @@ def maintain():
                 log.write(f'{exc}\n')
                 failures.append(f'{label}未完成')
                 return 1
-        run('Homebrew 更新', [sys.executable, '-u', str(BIN / 'brew_maintain.py'), '--auto'])
+        run('Homebrew 更新', [sys.executable, '-u', str(BIN / 'brew_maintain.py'), '--auto', '--gui-sudo'])
         npm = str(node / 'npm') if node else shutil.which('npm', path=env['PATH'])
         if npm:
             try:
@@ -89,6 +89,8 @@ def maintain():
         failures[failures.index('Homebrew 更新未完成')] += '：' + '、'.join(names)
         if 'sudo: a password is required' in log_text:
             failures[0] += '；安装需要管理员密码'
+        if '管理员授权已取消或超时' in log_text:
+            failures[0] += '；管理员授权已取消或超时'
     failure_count = len(failures) + max(0, len(failed_casks) - 1)
     notify = [sys.executable, str(BIN / 'task_notify.py'), '--key', 'software-updates']
     if failures:

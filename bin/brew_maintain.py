@@ -12,6 +12,8 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
+import tempfile
 
 EXCLUDE = {"claude", "typora"}
 
@@ -74,7 +76,7 @@ def check_app_exists(app_name):
     return False
 
 
-def main():
+def maintain():
     failed = []
     # 默认全自动（不问 y）。--auto 保留兼容（已是默认，等价 no-op）；
     # --ask 才恢复卸载孤儿前的交互确认。
@@ -158,6 +160,7 @@ def main():
         cask_timeout = None  # 不限时，避免大包被误杀
         failed = []
         for i, token in enumerate(to_upgrade, 1):
+            BREW_ENV['AUTOMATION_UPDATE_ITEM'] = token
             print(f"\n   [{i}/{len(to_upgrade)}] {token}...", flush=True)
             t0 = time.time()
             try:
@@ -209,6 +212,24 @@ def main():
         return 1
     print("\n✅ 维护完成")
     return 0
+
+
+def main():
+    if '--gui-sudo' not in sys.argv:
+        return maintain()
+    helper = Path(__file__).resolve().parents[1] / 'scripts/system/update_askpass.py'
+    with tempfile.TemporaryDirectory(prefix='homebrew-update-auth-') as session:
+        old_env = dict(BREW_ENV)
+        try:
+            BREW_ENV.update(SUDO_ASKPASS=str(helper),
+                            AUTOMATION_UPDATE_CANCEL_FILE=str(Path(session) / 'cancelled'),
+                            AUTOMATION_UPDATE_ITEM='Homebrew 软件维护')
+            return maintain()
+        finally:
+            if (Path(session) / 'cancelled').exists():
+                print('管理员授权已取消或超时；需权限的更新未完成，下次运行可重新授权。', flush=True)
+            BREW_ENV.clear()
+            BREW_ENV.update(old_env)
 
 
 if __name__ == "__main__":

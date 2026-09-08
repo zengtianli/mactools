@@ -24,7 +24,7 @@ META = {
     'com.tianli.acad-due': ('学术到期提醒', '提醒', '未来 30 天；复用 due_notify → acad 检查器', '可统一入口'),
     'com.tianli.cases-due': ('案件到期提醒', '提醒', '未来 30 天；复用 due_notify → cases 检查器', '可统一入口'),
     'com.tianli.client-due': ('客户交付与回款', '提醒', '未来 14 天；要求明确在办、未付及依据', '可统一入口'),
-    'com.tianli.always-latest': ('软件自动更新', '更新', '统一执行 Homebrew 维护 + npm 全局更新', '已共用入口'),
+    'com.tianli.always-latest': ('软件自动更新', '更新', 'Homebrew + npm；需要 sudo 时弹密码框，取消后本轮不再追问', '已共用入口'),
     'com.tianli.weekly-reports': ('三类周报', '报告', '美西周日 08:00 到期；每小时检查及开机补跑', '可统一入口'),
     'com.tianli.monthly-reports': ('三类月报', '报告', '美西每月 2 日 08:00 到期；每小时检查及开机补跑', '可统一入口'),
     'com.tianli.optionsdesk-daily': ('投资每日复盘', '投资', '按交易日历，收盘后 1 小时执行；当日成功不重复', '保留独立'),
@@ -101,7 +101,7 @@ def generate(output):
         ('已合并', '三类到期提醒', '统一为 reminders，每日本机时间 09:10 及加载时，依次检查学术、案件、客户。逐源记录错误，逐条通知去重；各类到期规则和业务证据要求保留。', '调度 3 → 1；学术/案件 30 天，客户 14 天', 'primary', [('Dev/tools/mactools/deploy/com.tianli.reminders.plist', '晨间统一 plist'), ('Dev/tools/mactools/bin/due_notify.py', '学术与案件适配器'), ('Dev/tools/mactools/bin/client_due.py', '客户交付 / 回款判定'), ('Library/Application Support/AutomationGroups/reminders.json', '最近逐项运行结果')]),
         ('先决定是否恢复', '健康检查 + 路径检查', '两个任务都已暂停，软链和硬编码路径检查有部分重叠。若恢复，可统一检查报告入口；保留各检查器的范围和退出码，先验证旧入口仍适用。', '此时合并不会减少任何运行负担', '', [('Dev/tools/dev/lib/tools/sites/health_check.py', '健康检查项：软链 / 导入 / 路径 / shebang'), ('Dev/tools/dev/lib/tools/ssot/paths.py', '路径审计、死引用与软链检查')]),
         ('保持独立', '通知的采集 / 队列 / 总结 / 同步', '常驻采集、1 分钟队列、5 分钟同步、1 小时模型总结承担不同职责。云同步显式使用 --no-llm。合并进程会让慢模型或网络失败影响快链路。', '可以共用日志展示，继续分别启停与恢复', '', [('Library/LaunchAgents/com.notifhub.summarize.plist', '总结任务排程'), ('.local/lib/notifhub/sync_cloud.py', '云同步：无 LLM 生成 + HTTPS 上传'), ('Library/LaunchAgents/com.notifhub.daemon.plist', '常驻采集')]),
-        ('已经合并到位', '软件更新 + Mac 接单', 'always_latest 已汇总 Homebrew 与 npm，并统一锁、日志和失败通知。mac-agent 已汇总公众号和 SOP 接单，分别捕获错误。两组用途不同，保持各自入口。', '更新耗时长，继续与报告、提醒分开', '', [('Dev/tools/mactools/bin/always_latest.py', '软件维护总入口'), ('Dev/tools/dev/lib/tools/media/mac_agent.py', '两条接单链及独立错误处理')]),
+        ('已经合并到位', '软件更新 + Mac 接单', '软件更新已汇总 Homebrew 与 npm；需要 sudo 时弹隐藏密码输入框，取消或超时后本轮不再追问，密码不落盘。mac-agent 汇总公众号和 SOP 接单，分别处理错误。', '更新与接单各自运行；sudo 授权按系统缓存策略', '', [('Dev/tools/mactools/bin/always_latest.py', '软件维护总入口'), ('Dev/tools/mactools/scripts/system/update_askpass.py', 'sudo 密码弹窗接口'), ('Dev/tools/dev/lib/tools/media/mac_agent.py', '两条接单链及独立错误处理')]),
     ]
     card_html = ''
     for tag, title, body, impact, style, refs in cards:
