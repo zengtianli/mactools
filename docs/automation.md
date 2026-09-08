@@ -1,6 +1,6 @@
 # 自动化管理入口
 
-进入 `cd ~/Dev/jobs`。本目录是软链接工作台，配置与脚本保留在原项目；macOS 仍从 `~/Library/LaunchAgents` 加载任务。
+进入 `cd ~/Dev/jobs`。青龙等独立自动化作业的真身放在这里；业务仓的任务通过软链接接入，macOS 仍从 `~/Library/LaunchAgents` 加载任务。
 
 在此目录开新会话：项目上下文为 `CLAUDE.md`，最近交接为 `handoffs/current.md`，`HARNESS.md` 链接到全局规则唯一源。上下文与交接原版存于 mactools 的 `docs/jobs/`，通过软链接接入。
 
@@ -25,7 +25,7 @@
 | `updates/` | 自动更新总入口与 Homebrew 维护脚本的链接；日常触发用 `ctl run always-latest` |
 | `projects/mactools/` | 更新、周报/月报、到期提醒的实现 |
 | `projects/dev-tools/` | Git 同步、健康检查、路径检查、下载整理等实现 |
-| `projects/qinglong/` | 青龙签到与脚本调度；本机面板 http://127.0.0.1:5700 |
+| `qinglong/` | 青龙项目真身（脚本、配置、容器数据）；本机面板 http://127.0.0.1:5700 |
 | `projects/notifhub/` | 通知采集、队列、总结与同步 |
 | `projects/investment/` | 投资自动任务 |
 | `projects/kb/` | 知识库导入与到期提醒 |

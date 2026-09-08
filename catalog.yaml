@@ -12,7 +12,6 @@ docs: ./README.md
 # 运行时表面(2026-08-10 应用注册表立;对账: app_registry.py audit)
 surfaces:
   - {type: launchd, id: com.tianli.always-latest}
-  - {type: launchd, id: com.tianli.weekly-reports}
-  - {type: launchd, id: com.tianli.monthly-reports}
-  - {type: launchd, id: com.tianli.client-due}
+  - {type: launchd, id: com.tianli.reports}
+  - {type: launchd, id: com.tianli.reminders}
 lifecycle: active   # 2026-08-10 lint 补标(有 live 表面/显式 form 必带 lifecycle)

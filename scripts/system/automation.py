@@ -107,7 +107,6 @@ def install():
         'updates/brew_maintain.py': REPO / 'bin/brew_maintain.py',
         'projects/mactools': REPO,
         'projects/dev-tools': HOME / 'Dev/tools/dev',
-        'projects/qinglong': HOME / 'Apps/cli/qinglong',
         'projects/notifhub': HOME / 'Apps/cli/notifhub',
         'projects/investment': HOME / 'investment/options/robinhood',
         'projects/kb': HOME / 'Dev/tools/kb',
