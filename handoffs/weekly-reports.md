@@ -1,5 +1,7 @@
 # 周报与客户期限自动化
 
+2026-09-08 调度入口已合并：周/月报使用 `com.tianli.reports`（每小时＋加载时），三类期限使用 `com.tianli.reminders`（本机每天 09:10＋加载时）。原业务脚本、状态与逐项通知保留；以下独立 label 仅为上线历史。当前控制与回退见 `../docs/automation.md`。
+
 阅读修订：六篇周/月报与共享模板已扩充，正文来源编号改文末默认折叠；当前实现与取材上限以 /Users/tianli/Dev/tools/mactools/handoffs/report-reading-revision.md 为准。下文保留首期上线历史。
 
 用户授权：每周投资总结、开发周报、水利周报；基于本人实际记录，生成后发布并通知。客户期限只读明确未完成记录，不猜日期或回款。

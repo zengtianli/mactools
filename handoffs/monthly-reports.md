@@ -1,5 +1,7 @@
 # 月报自动化
 
+2026-09-08 月报与周报的 launchd 入口合并为 `com.tianli.reports`，仍每小时＋加载时检查，周/月业务日期、回执和重试独立。下文独立月报 label 为历史；当前控制见 `../docs/automation.md`。
+
 后续阅读修订：正文已扩充、来源默认折叠、月末最终状态补核；当前模板和采样以 /Users/tianli/Dev/tools/mactools/handoffs/report-reading-revision.md 为准。下文保留首次实现与首发历史。
 
 用户要求开发、水利、投资三类月报，并授权选择合适起始时间。

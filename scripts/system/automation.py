@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Personal launchd tasks and a symlink workspace; no copied schedules."""
 import argparse
+import json
 import os
 from pathlib import Path
 import plistlib
@@ -152,6 +153,12 @@ def main():
             for line in info.splitlines():
                 if re.match(r'\s*(state|pid|runs|last exit code|last terminating signal) =', line):
                     print(line.strip())
+        if label in ('com.tianli.reports', 'com.tianli.reminders'):
+            receipt = HOME / 'Library/Application Support/AutomationGroups' / (label.split('.')[-1] + '.json')
+            print(f'分任务回执：{receipt}')
+            if receipt.exists():
+                for name, entry in json.loads(receipt.read_text()).get('tasks', {}).items():
+                    print(f'  {name}: {entry["status"]}, exit={entry.get("exit_code", "未结束")}；日志：{HOME}/Library/Logs/{name}.log / {name}.err')
     else:
         control(args.action, label, path, data)
 

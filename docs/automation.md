@@ -28,7 +28,13 @@
 
 `ctl` 每次现场读取 `com.tianli.*`、`cyou.tianli.*`、`com.notifhub.*`，不维护第二份任务清单。第三方 LaunchAgents 可在 `launchagents/` 查看，但不纳入此命令的启停范围。青龙容器内任务、VPS 调度和第三方软件自带更新仍使用各自原管理入口；`qinglong-ckwatch` 只控制 Cookie 监视任务。
 
-常用短名：`always-latest`（Homebrew 与 npm 全局更新）、`weekly-reports`、`monthly-reports`、`auto-git-sync`、`daily-health`、`paths-audit`、`downloads-router`、`qinglong-ckwatch`。通知任务可用完整名称，例如 `com.notifhub.summarize`。
+常用短名：`always-latest`（Homebrew 与 npm 全局更新）、`reports`（周报＋月报）、`reminders`（学术＋案件＋客户期限）、`auto-git-sync`、`daily-health`、`paths-audit`、`downloads-router`、`qinglong-ckwatch`。通知任务可用完整名称，例如 `com.notifhub.summarize`。
+
+`reports` 每小时整点和加载时检查，顺序运行周报、月报；各自的业务日期、发布锁、状态、重试与日志不变。`reminders` 每日本机时间 09:10 和加载时检查三类期限，学术/案件仍为 30 天，客户仍为 14 天，通知逐项去重。一项失败继续下一项；报告单项最多 4 小时、提醒单项最多 30 分钟，超时会停止该项并记录失败。
+
+`./ctl show reports` / `./ctl show reminders` 可查看分任务结果。汇总回执在 `~/Library/Application Support/AutomationGroups/{reports,reminders}.json`，原分任务日志仍在 `~/Library/Logs/{weekly-reports,monthly-reports,acad-due,cases-due,client-due}.{log,err}`。暂停组会同时暂停组内全部自动任务；按业务手动补跑继续使用原脚本。
+
+2026-09-08 合并前六份配置及原启停状态保存在 `~/Dev/jobs/archive/consolidation-20260908-200803/`，回退方式见该目录 `README.md`。旧部署源移入各项目 `deploy/retired/`，不再属于安装入口。
 
 排程以 plist 和任务代码的内部条件为准：`StartCalendarInterval` 用 Mac 本地时区，青龙用容器时区；每小时唤醒不等于每小时生成报告。已加载、进程退出码、实际业务成功是不同状态。
 
