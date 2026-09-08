@@ -35,8 +35,10 @@
 - 镜像 ID、DNS、端口绑定均不变；挂载确认 `/Users/tianli/Dev/jobs/qinglong/data`。
 - `ctl show qinglong-ckwatch` 确认新脚本/日志/真实 plist 路径；迁移后实际运行退出 0。全部任务 17 项，12 已加载、5 暂停，保留原状态。
 - downloads-organizer 用新路径重建虚拟环境，22 项测试通过。
+- 青龙内部 douyin-mcp 已有虚拟环境的入口、editable .pth 和 direct_url 路径已同步；解释器导入路径验证通过，未启用 MCP。
 - 注册表 171 份 catalog，enumeration_errors 和 local_errors 均为空；Apps 59 项落位一致。
 - paths audit --strict 退出 0；菜单 audit 结构及线上保护检查通过；说明书生成器 --check 通过。未发布网站。
+- 站群完整 `pnpm build` 在依赖解析阶段受已有 `@tlz/i18n@workspace:*` 缺少 workspace 包的问题阻断；本次仅验证说明书生成一致性，没有声称整站构建或上线通过。
 - CK 写回验活改用原 ck_probe 的复检接口；模拟首探误报随后恢复、复检仍失效两种结果通过；登录日志不再打印手机号、短信验证码或 CK 前缀。
 
 ## CK 尚未完成
@@ -44,6 +46,8 @@
 新路径现场复检两次仍 DEAD。已运行 `qinglong/auto-login/relogin.sh`，自动填号、勾选和点击发码代码已执行，但截图仍是登录表单，尚未收到短信、未取得新 CK。不能把脚本打印的“验证码已弹出”当成验证码确已显示。用户若已完成页面操作，先核本次进程和 result.json 时间，再由 set_ck 验活，避免无谓再次发码。
 
 ## 回退依据
+
+本轮涉及的 15 个仓库提交均已推送，核对 HEAD 与各自 upstream 无领先/落后。提交快照在下方回退目录 `commits.json`。保留用户原有未提交差异（青龙历史账本、Apps 推广材料、站群既有生成差异、下载工具 Raycast 注释等），未一并提交。
 
 `~/Dev/jobs/archive/placement-20260908-223923/` 保留映射、独立枚举结果、迁移前任务定义、容器配置、数据库备份、旧 LaunchAgent 与并发 diff；目录权限 0700，不入 git。路径重写前件在 `~/Dev/_archive/path-rewrites/20260908-224307/`。
 
