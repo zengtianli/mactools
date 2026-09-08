@@ -1,5 +1,7 @@
 # 自动化管理入口
 
+资源监控 `resource-watch`：每 15 秒采样；整机 CPU ≥90% 或严重内存压力持续 60 秒后弹窗，让本人勾选正常退出的应用（也可关闭全部模拟器）。不自动强杀；30 分钟冷却。原生常驻程序，记录只留本机 14 天。详情见 `scripts/system/resource_watch/README.md`。暂停用 `./ctl pause resource-watch`，恢复用 `./ctl resume resource-watch`。
+
 进入 `cd ~/Dev/jobs`。青龙等独立自动化作业的真身放在这里；业务仓的任务通过软链接接入，macOS 仍从 `~/Library/LaunchAgents` 加载任务。
 
 在此目录开新会话：项目上下文为 `CLAUDE.md`，最近交接为 `handoffs/current.md`，`HARNESS.md` 链接到全局规则唯一源。上下文与交接原版存于 mactools 的 `docs/jobs/`，通过软链接接入。
