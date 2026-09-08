@@ -93,6 +93,8 @@ if CommandLine.arguments.contains("--prompt") || CommandLine.arguments.contains(
 }
 
 let defaults: [String: Any] = ["interval_seconds": 15, "cpu_threshold": 90, "sustained_seconds": 60, "cooldown_seconds": 1800, "retention_days": 14]
+let lockFD = open(root.appendingPathComponent("monitor.lock").path, O_CREAT | O_RDWR, 0o600)
+if !CommandLine.arguments.contains("--once") && (lockFD < 0 || flock(lockFD, LOCK_EX | LOCK_NB) != 0) { exit(0) }
 let configURL = root.appendingPathComponent("config.json")
 if !FileManager.default.fileExists(atPath: configURL.path) { writeJSON(defaults, "config.json") }
 let config = (try? JSONSerialization.jsonObject(with: Data(contentsOf: configURL))) as? [String: Any] ?? defaults
