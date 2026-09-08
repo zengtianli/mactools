@@ -99,6 +99,9 @@ def install():
     links = {
         'ctl': Path(__file__).resolve(),
         'README.md': REPO / 'docs/automation.md',
+        'CLAUDE.md': REPO / 'docs/jobs/CLAUDE.md',
+        'HARNESS.md': HOME / 'Dev/tools/cc-home/HARNESS.md',
+        'handoffs': REPO / 'docs/jobs/handoffs',
         'launchagents': AGENTS,
         'updates/always_latest.py': REPO / 'bin/always_latest.py',
         'updates/brew_maintain.py': REPO / 'bin/brew_maintain.py',

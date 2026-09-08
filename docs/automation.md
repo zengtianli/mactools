@@ -2,6 +2,8 @@
 
 进入 `cd ~/Dev/jobs`。本目录是软链接工作台，配置与脚本保留在原项目；macOS 仍从 `~/Library/LaunchAgents` 加载任务。
 
+在此目录开新会话：项目上下文为 `CLAUDE.md`，最近交接为 `handoffs/current.md`，`HARNESS.md` 链接到全局规则唯一源。上下文与交接原版存于 mactools 的 `docs/jobs/`，通过软链接接入。
+
 可视化清单与合并建议：`~/Dev/jobs/index.html`（只读快照）。刷新数据用 `python3 ~/Dev/tools/mactools/scripts/system/automation_report.py`，然后重新打开页面。
 
 ```bash
