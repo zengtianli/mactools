@@ -2,6 +2,8 @@
 
 进入 `cd ~/Dev/jobs`。本目录是软链接工作台，配置与脚本保留在原项目；macOS 仍从 `~/Library/LaunchAgents` 加载任务。
 
+可视化清单与合并建议：`~/Dev/jobs/index.html`（只读快照）。刷新数据用 `python3 ~/Dev/tools/mactools/scripts/system/automation_report.py`，然后重新打开页面。
+
 ```bash
 ./ctl list                         # 个人后台任务及当前状态
 ./ctl show always-latest           # 自动更新的排程、执行入口、日志路径与最近退出码
