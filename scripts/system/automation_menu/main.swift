@@ -81,6 +81,7 @@ func decoder() -> JSONDecoder {
     var timer: Timer?
     var busy = false
     var backend: Process?
+    var lastBackendStart = Date.distantPast
     let base = "http://127.0.0.1:8798"
     let session: URLSession = {
         let c = URLSessionConfiguration.ephemeral
@@ -108,6 +109,8 @@ func decoder() -> JSONDecoder {
         }
     }
     func startBackend() {
+        guard backend?.isRunning != true, Date().timeIntervalSince(lastBackendStart) > 10 else { return }
+        lastBackendStart = Date()
         let root = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()
         let script = root.appendingPathComponent("scripts/system/automation_monitor.py")
         let process = Process()
@@ -140,6 +143,7 @@ func decoder() -> JSONDecoder {
                 onChange?()
             } catch {
                 connectionError = "进度服务暂未连接；保留最后一次状态，稍后自动重连"
+                startBackend()
                 onChange?()
             }
         }
@@ -307,7 +311,9 @@ struct Panel: View {
         let active = model.running
         let investment = active.first { $0.id == "com.tianli.optionsdesk-daily" }
         if model.connectionError != nil { item.button?.title = "自动化 !" }
-        else if let job = investment, job.total > 0 { item.button?.title = "复盘 \(job.done)/\(job.total)" }
+        else if let job = investment, job.total > 0 {
+            item.button?.title = job.done == job.total ? (job.phase == "生成与自审" ? "复盘·自审" : "复盘·发布") : "复盘 \(job.done)/\(job.total)"
+        }
         else if !active.isEmpty { item.button?.title = "自动化 \(active.count)" }
         else { item.button?.title = model.failed.isEmpty ? "自动化" : "自动化 !\(model.failed.count)" }
         item.button?.toolTip = "\(active.count) 项运行中，\(model.failed.count) 项需要处理。点击查看进度与结果。"
