@@ -81,6 +81,7 @@ func decoder() -> JSONDecoder {
     var timer: Timer?
     var busy = false
     var backend: Process?
+    var receiptWindow: NSWindowController?
     var lastBackendStart = Date.distantPast
     let base = "http://127.0.0.1:8798"
     let session: URLSession = {
@@ -163,6 +164,82 @@ func decoder() -> JSONDecoder {
             } catch { settingError = "提醒设置未保存，请重试" }
         }
     }
+    func showReceipt(_ job: Job) {
+        let controller = NSHostingController(rootView: ReceiptView(initialJob: job, model: self))
+        let window = NSWindow(contentViewController: controller)
+        window.title = job.name + " · 运行回执"
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.setContentSize(NSSize(width: 700, height: 560))
+        window.minSize = NSSize(width: 500, height: 360)
+        window.center()
+        receiptWindow = NSWindowController(window: window)
+        receiptWindow?.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+}
+
+struct ReceiptView: View {
+    let initialJob: Job
+    @ObservedObject var model: Model
+    var job: Job { model.snapshot?.tasks.first { $0.id == initialJob.id } ?? initialJob }
+    @State private var tab = "概览"
+    var raw: String {
+        guard let path = job.receipt else { return "暂无运行回执" }
+        let url = URL(fileURLWithPath: path)
+        let source = tab == "运行日志" ? url.deletingPathExtension().appendingPathExtension("log") : url
+        guard let data = try? Data(contentsOf: source) else { return "本次任务没有可读取的\(tab)文件。" }
+        if tab == "原始回执", let value = try? JSONSerialization.jsonObject(with: data),
+           let formatted = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) {
+            return String(decoding: formatted, as: UTF8.self)
+        }
+        // Keep large generation logs responsive; the original remains available in Finder.
+        let tail = data.suffix(200_000)
+        let lines = String(decoding: tail, as: UTF8.self).components(separatedBy: .newlines)
+        return (data.count > tail.count || lines.count > 200 ? "显示最近 200 行；完整日志可用下方按钮查看。\n\n" : "") + lines.suffix(200).joined(separator: "\n")
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(job.name).font(.title2.bold())
+                Spacer()
+                Text(job.label).foregroundStyle(job.color)
+            }
+            Picker("回执内容", selection: $tab) {
+                Text("概览").tag("概览")
+                Text("运行日志").tag("运行日志")
+                Text("原始回执").tag("原始回执")
+            }.pickerStyle(.segmented)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if tab == "概览" {
+                        if let period = job.period { Text("交易日：\(period)").font(.headline) }
+                        Text(job.phase).font(.headline)
+                        Text(job.detail)
+                        if let error = job.error { Text(error).foregroundStyle(.orange) }
+                        ForEach(job.steps) { step in
+                            Label(step.name, systemImage: step.done ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(step.done ? .green : .secondary)
+                        }
+                        Divider()
+                        Label(job.schedule, systemImage: "clock")
+                        Text("依据：\(job.evidence)").foregroundStyle(.secondary)
+                    } else {
+                        Text(raw).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
+            }
+            HStack {
+                if let raw = job.url, let url = URL(string: raw) {
+                    Button("阅读结果") { NSWorkspace.shared.open(url) }
+                }
+                Spacer()
+                if let path = job.receipt {
+                    Button("在 Finder 中查看原文件") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+                }
+            }
+        }.padding(20).frame(minWidth: 460, minHeight: 320)
+    }
 }
 
 struct JobView: View {
@@ -222,8 +299,8 @@ struct JobView: View {
                     if let raw = job.url, let url = URL(string: raw), ["http", "https"].contains(url.scheme ?? "") {
                         Button("阅读结果") { NSWorkspace.shared.open(url) }
                     }
-                    if let path = job.receipt {
-                        Button("查看运行回执") { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
+                    if job.receipt != nil {
+                        Button("查看运行回执") { model.showReceipt(job) }
                     }
                     Spacer()
                 }.controlSize(.small)
@@ -234,6 +311,7 @@ struct JobView: View {
 
 struct Panel: View {
     @ObservedObject var model: Model
+    let height: CGFloat
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -286,7 +364,7 @@ struct Panel: View {
                 Spacer()
                 Text("每 5 秒刷新 · 本机")
             }.font(.caption2).foregroundStyle(.secondary)
-        }.padding(16).frame(width: 430, height: 640)
+        }.padding(16).frame(width: 430, height: height)
     }
 }
 
@@ -303,7 +381,6 @@ struct Panel: View {
         item.button?.target = self
         item.button?.action = #selector(toggle)
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: Panel(model: model))
         model.onChange = { [weak self] in self?.updateTitle() }
         model.start()
     }
@@ -323,7 +400,14 @@ struct Panel: View {
         if popover.isShown { popover.performClose(nil) }
         else if let button = item.button {
             model.fetch()
+            let height = min(CGFloat(640), (button.window?.screen?.visibleFrame.height ?? 720) - 40)
+            let controller = NSHostingController(rootView: Panel(model: model, height: height))
+            controller.preferredContentSize = NSSize(width: 430, height: height)
+            popover.contentViewController = controller
+            popover.contentSize = NSSize(width: 430, height: height)
+            NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
         }
     }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
