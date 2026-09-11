@@ -1,5 +1,11 @@
 # 自动更新与通知改造
 
+## 2026-09-11 菜单栏修复与 govern
+
+本会话新增的 Automation Monitor 原来只核了状态JSON，漏掉真实弹窗裁切/焦点与回执按钮可用性。已修 `scripts/system/automation_menu/main.swift`：打开时设置 hosting 和 popover 的明确尺寸、按所在屏幕可用高度限制并取焦点；回执打开应用内概览/日志/原始回执窗口，跟随采集更新，长日志只呈现最近200行。已装机 CUA 实测搜索、筛选、展开、滚动、提醒保存与恢复、回执读取及结果打开实际博客正文。不能把 getApp 激活、AX 树存在或 NSWorkspace.open 的返回值作为所有交互通过。当前提醒保留启动/进度/结束。
+
+源提交 `6225ce9` 已推送；之前大日志进度、后端恢复、通知去重和服务/作业分辨已在原实现修复。本轮8项状态回归通过，真实API19项任务由最终Swift产物解码通过。操作细节仍只在 `docs/automation-monitor.md`；通用菜单栏验收已回流 app 技能原版。全量错误责任与验证索引见 `/Users/tianli/investment/options/handoffs/daily-review-automation.md` 的同日 govern 节；没有新增第二套通知服务或治理台账。
+
 用户授权：保留实用自动更新，失败才通知；点击看完整结果；期限逐项去重和稍后提醒；TestFlight 只检查到期、不自动构建上传。
 
 ## 已落地
