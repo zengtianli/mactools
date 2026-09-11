@@ -9,6 +9,16 @@ import automation_monitor as m
 
 
 class ProgressTests(unittest.TestCase):
+    def test_progress_survives_large_deployment_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'run.log'
+            record = '@@STEP@@ ' + json.dumps({'steps': [{'name': '正文', 'done': True}]})
+            path.write_text(record + '\n' + 'upload file\n' * 40000)
+            self.assertEqual(m.file_steps(path)[0]['done'], True)
+            with path.open('a') as f:
+                f.write('\n执行：python review_auto.py --date 2026-09-10\n')
+            self.assertEqual(m.file_steps(path), [])
+
     def test_last_attempt_and_partial_log(self):
         first = '@@STEP@@ ' + json.dumps({'steps': [{'name': '正文', 'done': True}]})
         text = first + '\n执行：python review_auto.py --date 2026-09-10\n'

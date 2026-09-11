@@ -66,6 +66,30 @@ def last_steps(text):
     return []
 
 
+def file_steps(path):
+    """Deployment output can push the last progress record beyond a log tail."""
+    if not path.exists():
+        return []
+    with path.open('rb') as f:
+        f.seek(0, 2)
+        pos, carry = f.tell(), b''
+        while pos:
+            length = min(pos, 65536)
+            pos -= length
+            f.seek(pos)
+            lines = (f.read(length) + carry).split(b'\n')
+            carry = lines.pop(0) if pos else b''
+            for raw in reversed(lines):
+                line = raw.decode('utf-8', errors='replace')
+                if line.startswith('@@STEP@@ '):
+                    steps = last_steps(line)
+                    if steps:
+                        return steps
+                if line.startswith('执行：') and 'review_auto.py' in line:
+                    return []
+    return []
+
+
 def launch_snapshot():
     result = auto.launch('list').stdout
     states = {}
@@ -85,7 +109,7 @@ def investment(row, home, now):
         return
     path = receipts[-1]
     state = read_json(path)
-    row.update(period=path.stem, receipt=str(path), url=state.get('url'), steps=last_steps(tail(path.with_suffix('.log'))))
+    row.update(period=path.stem, receipt=str(path), url=state.get('url'), steps=file_steps(path.with_suffix('.log')))
     today = dt.datetime.fromtimestamp(now, ZoneInfo('America/New_York')).date().isoformat()
     pending = state.get('scheduled_retry_at') and state.get('attempts', 0) == 0 and state.get('retry_after', 0) > now
     active = bool(row['pid']) and path.stem == today and not state.get('complete') and not pending
@@ -365,7 +389,7 @@ def install():
     if auto.loaded(LABEL) is None:
         auto.launch('enable', f'{auto.DOMAIN}/{LABEL}')
         auto.launch('bootstrap', auto.DOMAIN, path)
-    print(URL)
+    print(f'菜单栏自动化已启用：{APP}')
 
 
 def main():
