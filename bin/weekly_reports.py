@@ -134,6 +134,8 @@ def collect(kind, start, end, frequency='weekly'):
                 continue
             raw = post.zh_md.read_text()
             fm = bp._parse_frontmatter_text(raw)
+            if fm.get('published') is False or fm.get('automation_rehearsal') is True:
+                continue
             try:
                 day = dt.date.fromisoformat(str(fm.get('date')))
             except ValueError:

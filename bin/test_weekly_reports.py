@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 import weekly_reports as w
@@ -138,6 +139,19 @@ class CollectionTests(unittest.TestCase):
         rows, _ = self.run_collect(log)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]['date'], '2026-09-12')
+
+    def test_investment_excludes_unpublished_and_rehearsal_posts(self):
+        posts = {}
+        for slug, metadata in [('daily', ''), ('draft', 'published: false\n'), ('rehearsal', 'automation_rehearsal: true\n')]:
+            path = self.repo / (slug+'.md')
+            path.write_text('---\ndate: "2026-09-08"\ntitle: "Daily review"\n'+metadata+'---\nVerified daily review.\n')
+            posts[slug] = SimpleNamespace(site_key='options', zh_md=path, url='https://example.test/'+slug)
+        calendar = SimpleNamespace(require_calendar_coverage=lambda day: None, is_trading_day=lambda day: str(day)=='2026-09-08')
+        start, end = w.period(dt.datetime.fromisoformat('2026-09-12T08:00:00+08:00'))
+        with patch.object(w.bp, 'all_slugs', return_value=list(posts)), patch.object(w.bp, 'post', side_effect=posts.get), patch.dict('sys.modules', {'quantlab.tcal': calendar}):
+            rows, coverage = w.collect('investment', start, end)
+        self.assertEqual([r['id'] for r in rows], ['post:daily'])
+        self.assertEqual(coverage['unavailable'], [])
 
 
 class ExecuteTests(unittest.TestCase):

@@ -6,6 +6,8 @@
 
 保留已加载的 `com.tianli.reports` 每小时及加载时检查；当轮通过 `~/Dev/jobs/ctl run reports` 从真实调度入口启动。调度边界、下一期、休眠补最近期、首期衔接、采集日期与排除终点等周/月报相关32项测试通过。状态归档在 `~/Library/Application Support/WeeklyReports/2026-09-12/`，完成情况以各类 `state.json` 为准。
 
+当轮投资取材预检发现两篇 `automation_rehearsal:true`、`published:false` 演练稿混入。采集器已排除两类显式标记，并补回归测试（累计33项通过）。在投资阶段尚未开始、归档目录不存在时，用修正后的原 `collect/save` 函数预备该期 `investment/evidence.json`：仅9月8日至11日四篇正式日报，无交易日缺口；运行中的既有发布引擎将消费该证据，不清空或重写成功状态。
+
 2026-09-08 调度入口已合并：周/月报使用 `com.tianli.reports`（每小时＋加载时），三类期限使用 `com.tianli.reminders`（本机每天 09:10＋加载时）。原业务脚本、状态与逐项通知保留；以下独立 label 仅为上线历史。当前控制与回退见 `../docs/automation.md`。
 
 阅读修订：六篇周/月报与共享模板已扩充，正文来源编号改文末默认折叠；当前实现与取材上限以 /Users/tianli/Dev/tools/mactools/handoffs/report-reading-revision.md 为准。下文保留首期上线历史。
