@@ -58,10 +58,29 @@ class PeriodTests(unittest.TestCase):
         self.assertEqual((start.hour, end.hour), (8, 8))
         self.assertEqual((end.timestamp()-start.timestamp())/3600, 167)
 
-    def test_fall_dst_keeps_eight_and_169_hours(self):
-        start, end = w.period(dt.datetime.fromisoformat('2026-11-01T08:00:00-08:00'))
+    def test_new_schedule_ignores_us_dst(self):
+        start, end = w.period(dt.datetime.fromisoformat('2026-11-07T08:00:00+08:00'))
         self.assertEqual((start.hour, end.hour), (8, 8))
-        self.assertEqual((end.timestamp()-start.timestamp())/3600, 169)
+        self.assertEqual((end.timestamp()-start.timestamp())/3600, 168)
+        self.assertEqual(end.weekday(), 5)
+
+    def test_transition_before_and_at_saturday_eight(self):
+        _, previous = w.period(dt.datetime.fromisoformat('2026-09-12T07:59:59+08:00'))
+        self.assertEqual(previous, w.WEEKLY_PREVIOUS_END)
+        self.assertEqual(w.next_weekly_due(previous).isoformat(), '2026-09-12T08:00:00+08:00')
+        start, end = w.period(dt.datetime.fromisoformat('2026-09-12T08:00:00+08:00'))
+        self.assertEqual(start, previous)
+        self.assertEqual(start.isoformat(), '2026-09-06T23:00:00+08:00')
+        self.assertEqual(end.isoformat(), '2026-09-12T08:00:00+08:00')
+        self.assertEqual(w.next_weekly_due(end).isoformat(), '2026-09-19T08:00:00+08:00')
+
+    def test_following_week_boundary_and_wake_catchup(self):
+        _, end = w.period(dt.datetime.fromisoformat('2026-09-19T07:59:59+08:00'))
+        self.assertEqual(end, w.WEEKLY_SATURDAY_START)
+        for stamp in ('2026-09-19T08:00:00+08:00', '2026-09-21T12:00:00+08:00'):
+            start, end = w.period(dt.datetime.fromisoformat(stamp))
+            self.assertEqual(start, w.WEEKLY_SATURDAY_START)
+            self.assertEqual(end.isoformat(), '2026-09-19T08:00:00+08:00')
 
     def test_utc_input(self):
         self.assertEqual(w.period(dt.datetime.fromisoformat('2026-09-06T15:00:00+00:00')),
@@ -110,6 +129,15 @@ class CollectionTests(unittest.TestCase):
         rows, _ = self.run_collect(log)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]['date'], '2026-09-05')
+
+    def test_new_week_uses_shanghai_dates_and_excludes_deadline(self):
+        self.start, self.end = w.period(dt.datetime.fromisoformat('2026-09-12T08:00:00+08:00'))
+        def row(sha, stamp):
+            return f'{sha}\x1f{stamp}\x1fChanged code\x1f\x1e\n'
+        log = row('a'*40, '2026-09-12T07:59:59+08:00') + row('b'*40, '2026-09-12T08:00:00+08:00') + row('c'*40, '2026-09-06T22:59:59+08:00')
+        rows, _ = self.run_collect(log)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['date'], '2026-09-12')
 
 
 class ExecuteTests(unittest.TestCase):

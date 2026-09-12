@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evidence-based private weekly reports. Check hourly; publish once per PT week."""
+"""Evidence-based private reports. Check hourly; weekly due Saturday 08:00 Shanghai."""
 from __future__ import annotations
 import argparse
 import datetime as dt
@@ -22,6 +22,9 @@ HERE = Path(__file__).resolve().parent
 HQ = HOME / 'Dev/tools/dev/lib/tools/cc'
 ROOT = HOME / 'Library/Application Support/WeeklyReports'
 PT = ZoneInfo('America/Los_Angeles')
+SHANGHAI = ZoneInfo('Asia/Shanghai')
+WEEKLY_SATURDAY_START = dt.datetime(2026, 9, 12, 8, tzinfo=SHANGHAI)
+WEEKLY_PREVIOUS_END = dt.datetime(2026, 9, 6, 8, tzinfo=PT)
 KINDS = {'development': '开发周报', 'water': '水利周报', 'investment': '投资周报'}
 MONTHLY_RECENT_RECORDS = 20
 sys.path.insert(0, str(HQ))
@@ -43,17 +46,30 @@ def shift_month(value, delta):
 
 
 def period(now, frequency='weekly'):
-    """Wall-clock Sunday 08:00 boundaries preserve local time over DST."""
+    """Saturday 08:00 Shanghai from Sep 12; retain historical and monthly windows."""
     now = now.astimezone(PT)
     if frequency == 'monthly':
         end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         if now < end.replace(day=2, hour=8):
             end = shift_month(end, -1)
         return shift_month(end, -1), end
+    if now >= WEEKLY_SATURDAY_START:
+        local = now.astimezone(SHANGHAI)
+        end = dt.datetime.combine(local.date() - dt.timedelta(days=(local.weekday()-5) % 7), dt.time(8), SHANGHAI)
+        if local < end:
+            end -= dt.timedelta(days=7)
+        # The first earlier deadline continues from the last published Sunday.
+        start = max(end - dt.timedelta(days=7), WEEKLY_PREVIOUS_END.astimezone(SHANGHAI))
+        return start, end
     end = dt.datetime.combine(now.date() - dt.timedelta(days=(now.weekday()+1) % 7), dt.time(8), PT)
     if now < end:
         end -= dt.timedelta(days=7)
     return end - dt.timedelta(days=7), end
+
+
+def next_weekly_due(end):
+    candidate = end + dt.timedelta(days=7)
+    return min(candidate, WEEKLY_SATURDAY_START) if end < WEEKLY_SATURDAY_START else candidate
 
 
 def archive(start, end, frequency):
@@ -168,7 +184,7 @@ def collect(kind, start, end, frequency='weekly'):
                     identity = hashlib.sha256(str(repo).encode()).hexdigest()[:8]
                     records.append({'id': f'git:{identity}:{sha[:12]}', 'title': subject,
                                     'text': text, 'source': str(repo) + ' @ ' + sha[:12],
-                                    'group': repo.name, 'date': dt.datetime.fromisoformat(stamp).astimezone(PT).date().isoformat()})
+                                    'group': repo.name, 'date': dt.datetime.fromisoformat(stamp).astimezone(end.tzinfo).date().isoformat()})
             except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
                 coverage['unavailable'].append(f'{repo}: {exc}')
     records.sort(key=lambda r: (r['date'], r['id']))
@@ -267,7 +283,8 @@ def execute(kind, start, end, retry=False, frequency='weekly'):
         # Scope and gaps are deterministic, not entrusted to a generated summary.
         raw = post.zh_md.read_text()
         if '本期取材' not in raw:
-            scope = '\n\n本期取材：'+start.strftime('%Y-%m-%d %H:%M')+' 至 '+end.strftime('%Y-%m-%d %H:%M')+'（美西时间，不含终点）。只反映留有记录的工作；提交不等于交付或验收。\n'
+            zone_label = '北京时间' if end.tzinfo == SHANGHAI else '美西时间'
+            scope = '\n\n本期取材：'+start.strftime('%Y-%m-%d %H:%M')+' 至 '+end.strftime('%Y-%m-%d %H:%M')+f'（{zone_label}，不含终点）。只反映留有记录的工作；提交不等于交付或验收。\n'
             method = '每仓最多取最近 16 条。' if frequency == 'weekly' else f'每仓最多选取 40 条，保留最新 {MONTHLY_RECENT_RECORDS} 条并沿此前整月均匀取材；摘要按项目及月内周段轮转取材，最多 320 条，不是全部工作清单。'
             scope += f"\n本期纳入 {len(data['records'])} 条证据。" + (method if kind != 'investment' else '投资总结来自本期逐日复盘。') + '完整来源与覆盖明细保存在本机本期归档。后续建议反映这些记录中的状态，之后的更新不在本期范围内。\n'
             if data['coverage']['unavailable']:
@@ -339,7 +356,7 @@ def main(argv=None):
             p.error('--period must be a complete past calendar month')
     if a.check:
         _, scheduled_end = period(now, a.frequency)
-        next_due = shift_month(scheduled_end, 1).replace(day=2, hour=8) if a.frequency == 'monthly' else scheduled_end+dt.timedelta(days=7)
+        next_due = shift_month(scheduled_end, 1).replace(day=2, hour=8) if a.frequency == 'monthly' else next_weekly_due(scheduled_end)
         due = end.replace(day=2, hour=8) if a.frequency == 'monthly' else end
         print(json.dumps({'frequency': a.frequency, 'start': start.isoformat(), 'end': end.isoformat(), 'due': due.isoformat(), 'next': next_due.isoformat()}, ensure_ascii=False))
         return 0
