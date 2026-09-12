@@ -25,6 +25,7 @@ PT = ZoneInfo('America/Los_Angeles')
 SHANGHAI = ZoneInfo('Asia/Shanghai')
 WEEKLY_SATURDAY_START = dt.datetime(2026, 9, 12, 8, tzinfo=SHANGHAI)
 WEEKLY_PREVIOUS_END = dt.datetime(2026, 9, 6, 8, tzinfo=PT)
+MONTHLY_SATURDAY_START = dt.datetime(2026, 10, 3, 8, tzinfo=SHANGHAI)
 KINDS = {'development': '开发周报', 'water': '水利周报', 'investment': '投资周报'}
 MONTHLY_RECENT_RECORDS = 20
 sys.path.insert(0, str(HQ))
@@ -45,12 +46,27 @@ def shift_month(value, delta):
     return value.replace(year=index // 12, month=index % 12 + 1, day=1)
 
 
+def monthly_due(end):
+    """First Saturday 08:00 Shanghai for September 2026 and later reports."""
+    if (end.year, end.month) >= (2026, 10):
+        first = dt.date(end.year, end.month, 1)
+        saturday = first + dt.timedelta(days=(5-first.weekday()) % 7)
+        return dt.datetime.combine(saturday, dt.time(8), SHANGHAI)
+    return end.replace(day=2, hour=8)
+
+
 def period(now, frequency='weekly'):
-    """Saturday 08:00 Shanghai from Sep 12; retain historical and monthly windows."""
+    """Shanghai Saturday deadlines; retain historical PT report windows."""
     now = now.astimezone(PT)
     if frequency == 'monthly':
+        if now >= MONTHLY_SATURDAY_START:
+            local = now.astimezone(SHANGHAI)
+            end = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if local < monthly_due(end):
+                end = shift_month(end, -1)
+            return shift_month(end, -1), end
         end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if now < end.replace(day=2, hour=8):
+        if now < monthly_due(end):
             end = shift_month(end, -1)
         return shift_month(end, -1), end
     if now >= WEEKLY_SATURDAY_START:
@@ -346,7 +362,8 @@ def main(argv=None):
         if a.frequency != 'monthly' or not re.fullmatch(r'\d{4}-\d{2}', a.period):
             p.error('--period requires --frequency monthly and YYYY-MM')
         try:
-            start = dt.datetime.strptime(a.period, '%Y-%m').replace(tzinfo=PT)
+            zone = SHANGHAI if a.period >= '2026-09' else PT
+            start = dt.datetime.strptime(a.period, '%Y-%m').replace(tzinfo=zone)
         except ValueError:
             p.error('invalid calendar month')
         end = shift_month(start, 1)
@@ -354,8 +371,8 @@ def main(argv=None):
             p.error('--period must be a complete past calendar month')
     if a.check:
         _, scheduled_end = period(now, a.frequency)
-        next_due = shift_month(scheduled_end, 1).replace(day=2, hour=8) if a.frequency == 'monthly' else next_weekly_due(scheduled_end)
-        due = end.replace(day=2, hour=8) if a.frequency == 'monthly' else end
+        next_due = monthly_due(shift_month(scheduled_end, 1)) if a.frequency == 'monthly' else next_weekly_due(scheduled_end)
+        due = monthly_due(end) if a.frequency == 'monthly' else end
         print(json.dumps({'frequency': a.frequency, 'start': start.isoformat(), 'end': end.isoformat(), 'due': due.isoformat(), 'next': next_due.isoformat()}, ensure_ascii=False))
         return 0
     ROOT.mkdir(parents=True, exist_ok=True, mode=0o700)

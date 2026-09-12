@@ -36,6 +36,30 @@ class PeriodTests(unittest.TestCase):
         start,end = w.period(dt.datetime.fromisoformat('2026-09-02T08:00:00-07:00'),'monthly')
         self.assertEqual(w.archive(start,end,'monthly'),w.ROOT/'monthly/2026-08')
 
+    def test_monthly_transition_to_first_saturday_shanghai(self):
+        _, previous = w.period(dt.datetime.fromisoformat('2026-10-03T07:59:59+08:00'), 'monthly')
+        self.assertEqual(previous.isoformat(), '2026-09-01T00:00:00-07:00')
+        self.assertEqual(w.monthly_due(w.shift_month(previous, 1)).isoformat(), '2026-10-03T08:00:00+08:00')
+        start, end = w.period(dt.datetime.fromisoformat('2026-10-03T08:00:00+08:00'), 'monthly')
+        self.assertEqual(start.isoformat(), '2026-09-01T00:00:00+08:00')
+        self.assertEqual(end.isoformat(), '2026-10-01T00:00:00+08:00')
+        self.assertEqual(w.monthly_due(w.shift_month(end, 1)).isoformat(), '2026-11-07T08:00:00+08:00')
+
+    def test_monthly_first_is_saturday_after_full_shanghai_month(self):
+        stamp = dt.datetime.fromisoformat('2027-05-01T08:00:00+08:00')
+        start, end = w.period(stamp, 'monthly')
+        self.assertEqual(start.isoformat(), '2027-04-01T00:00:00+08:00')
+        self.assertEqual(end.isoformat(), '2027-05-01T00:00:00+08:00')
+        self.assertLess(end, stamp)
+        self.assertEqual(w.monthly_due(end), stamp)
+        self.assertEqual(w.period(stamp-dt.timedelta(seconds=1),'monthly')[1].date(), dt.date(2027,4,1))
+
+    def test_monthly_new_schedule_leap_year_and_us_dst(self):
+        start, end = w.period(dt.datetime.fromisoformat('2028-03-04T08:00:00+08:00'), 'monthly')
+        self.assertEqual((end.timestamp()-start.timestamp())/3600, 29*24)
+        start, end = w.period(dt.datetime.fromisoformat('2027-04-03T08:00:00+08:00'), 'monthly')
+        self.assertEqual((end.timestamp()-start.timestamp())/3600, 31*24)
+
     def test_monthly_sample_includes_early_and_late(self):
         result = w.spread(list(range(1000)),40)
         self.assertEqual((result[0],result[-1]),(0,999))
