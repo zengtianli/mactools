@@ -96,7 +96,6 @@ def git(repo, *args):
 
 
 def repositories(kind):
-    import yaml
     if kind == 'development':
         rows = json.loads((HOME / 'Dev/tools/configs/repo-map.json').read_text())['repos']
         result = {Path(row['local']).expanduser() for row in rows.values()
@@ -117,12 +116,9 @@ def repositories(kind):
                     pass  # catalogs without git cannot supply commit evidence
         result.add(HOME/'Dev/stations')
         return sorted(result)
-    roots = [HOME / 'Work/projects', HOME / 'Work/shared']
-    result = []
-    for root in roots:
-        catalog = yaml.safe_load((root / 'catalog.yaml').read_text())
-        result.extend(root / key for key in catalog['packages'])
-    return sorted(set(result))
+    # Work owns the current history after completed child repositories were
+    # consolidated. Catalog packages are business directories, not Git roots.
+    return [HOME / 'Work']
 
 
 def collect(kind, start, end, frequency='weekly'):

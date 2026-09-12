@@ -8,6 +8,8 @@
 
 当轮投资取材预检发现两篇 `automation_rehearsal:true`、`published:false` 演练稿混入。采集器已排除两类显式标记，并补回归测试（累计33项通过）。在投资阶段尚未开始、归档目录不存在时，用修正后的原 `collect/save` 函数预备该期 `investment/evidence.json`：仅9月8日至11日四篇正式日报，无交易日缺口；运行中的既有发布引擎将消费该证据，不清空或重写成功状态。
 
+首轮水利失败原因为Work已归并为主仓，旧采集器仍要求catalog各目录必须独立Git。现改从 `~/Work` 当前主仓读取，实测本期4条提交、无来源读取缺口，相关测试累计34项通过。开发正文已部署，但目录同步调用恰逢另一会话更新私密首页，旧版探针不匹配新版模板而失败；沿当前 `blog_private_site.py sync` 重同步后远端五文件哈希核验成功，保留另一会话对该共享引擎的修改，不回退页面。
+
 2026-09-08 调度入口已合并：周/月报使用 `com.tianli.reports`（每小时＋加载时），三类期限使用 `com.tianli.reminders`（本机每天 09:10＋加载时）。原业务脚本、状态与逐项通知保留；以下独立 label 仅为上线历史。当前控制与回退见 `../docs/automation.md`。
 
 阅读修订：六篇周/月报与共享模板已扩充，正文来源编号改文末默认折叠；当前实现与取材上限以 /Users/tianli/Dev/tools/mactools/handoffs/report-reading-revision.md 为准。下文保留首期上线历史。

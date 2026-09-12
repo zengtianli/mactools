@@ -114,6 +114,13 @@ class CollectionTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 w.collect('water', self.start, self.end)
 
+    def test_water_inventory_follows_consolidated_work_repository(self):
+        with patch.object(w, 'HOME', self.repo):
+            work = self.repo / 'Work'
+            (work / 'projects' / 'water-src').mkdir(parents=True)
+            (work / 'shared' / 'resources').mkdir(parents=True)
+            self.assertEqual(w.repositories('water'), [work])
+
     def test_all_git_log_failures_cannot_count_as_scanned(self):
         with self.assertRaises(RuntimeError):
             self.run_collect(subprocess.CalledProcessError(128, 'git log'))
