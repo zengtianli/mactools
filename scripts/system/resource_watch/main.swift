@@ -1,9 +1,8 @@
 import Cocoa
 import Darwin
 
-// CPU percentages in process rows follow ps: 100% means one logical core.
+// Process rows use interval CPU deltas: 100% means one logical core.
 let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/ResourceWatch")
-try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 let iso = ISO8601DateFormatter()
 func writeJSON(_ value: Any, _ name: String) {
     guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else { return }
@@ -29,26 +28,36 @@ func pressure() -> Int {
     var value: Int32 = 0; var size = MemoryLayout<Int32>.size
     return sysctlbyname("kern.memorystatus_vm_pressure_level", &value, &size, nil, 0) == 0 ? Int(value) : 0
 }
-func processes() -> [[String: Any]] {
-    let task = Process(); task.executableURL = URL(fileURLWithPath: "/bin/ps")
-    task.arguments = ["-axo", "pid=,pcpu=,rss=,comm="]
-    let pipe = Pipe(); task.standardOutput = pipe; task.standardError = FileHandle.nullDevice
-    guard (try? task.run()) != nil else { return [] }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile(); task.waitUntilExit()
-    var groups: [String: (Double, Int, Int)] = [:]
-    for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
-        let cols = line.split(maxSplits: 3, whereSeparator: { $0 == " " || $0 == "\t" })
-        guard cols.count == 4, let cpu = Double(cols[1]), let rss = Int(cols[2]) else { continue }
-        let path = String(cols[3]); var key = path
-        if path.contains("/CoreSimulator/") { key = "iOS 模拟器（全部设备）" }
-        else if let end = path.range(of: ".app/") { key = String(path[..<end.lowerBound]) + ".app" }
-        let old = groups[key] ?? (0, 0, 0); groups[key] = (old.0 + cpu, old.1 + rss, old.2 + 1)
-    }
-    return groups.sorted { $0.value.0 > $1.value.0 }.prefix(15).map { key, value in
-        ["path": key, "cpu_core_percent": value.0, "rss_mb_sum": value.1 / 1024, "processes": value.2]
-    }
+func hostCPU(_ old: [UInt32], _ ticks: [UInt32]) -> Double? {
+    let deltas = zip(ticks, old).map { Double($0 &- $1) }; let total = deltas.reduce(0, +)
+    return total > 0 ? 100 * (1 - deltas[2] / total) : nil
 }
 
+// Read-only diagnostics exit before creating state, taking the daemon lock or starting UI.
+if let index = CommandLine.arguments.firstIndex(of: "--diagnose") {
+    let argument = CommandLine.arguments.dropFirst(index + 1).first ?? "2"
+    guard let seconds = Double(argument), seconds.isFinite, (1...60).contains(seconds) else {
+        FileHandle.standardError.write(Data("--diagnose expects 1–60 seconds\n".utf8)); exit(2)
+    }
+    let oldProcesses = collectProcesses(); let oldTicks = cpuTicks()
+    let began = ProcessInfo.processInfo.systemUptime
+    Thread.sleep(forTimeInterval: seconds)
+    let currentProcesses = collectProcesses()
+    let ticks = cpuTicks(); let elapsed = ProcessInfo.processInfo.systemUptime - began
+    var snapshot = processReport(previous: oldProcesses, current: currentProcesses, logicalCores: ProcessInfo.processInfo.activeProcessorCount)
+    snapshot["time"] = iso.string(from: Date()); snapshot["read_only"] = true
+    snapshot["logical_cores"] = ProcessInfo.processInfo.activeProcessorCount
+    snapshot["host_sample_seconds"] = elapsed; snapshot["memory_pressure"] = pressure()
+    snapshot["cpu_percent"] = oldTicks.flatMap { old in ticks.flatMap { hostCPU(old, $0) } } as Any? ?? NSNull()
+    let data = try JSONSerialization.data(withJSONObject: snapshot, options: [.sortedKeys, .prettyPrinted])
+    FileHandle.standardOutput.write(data); FileHandle.standardOutput.write(Data([10]))
+    if !oldProcesses.collected || !currentProcesses.collected || !currentProcesses.jobsCollected {
+        FileHandle.standardError.write(Data("Process/job collection failed; attribution is incomplete.\n".utf8)); exit(3)
+    }
+    exit(0)
+}
+
+try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 if CommandLine.arguments.contains("--prompt") || CommandLine.arguments.contains("--preview") {
     let preview = CommandLine.arguments.contains("--preview")
     let app = NSApplication.shared; app.setActivationPolicy(.accessory); app.finishLaunching()
@@ -57,15 +66,19 @@ if CommandLine.arguments.contains("--prompt") || CommandLine.arguments.contains(
     let rows = snapshot["top"] as? [[String: Any]] ?? []
     let alert = NSAlert(); alert.messageText = preview ? "资源监控 · 弹窗预览" : "Mac 持续高负载"
     let cpu = snapshot["cpu_percent"] as? Double ?? 0
-    alert.informativeText = String(format: "整机 CPU %.0f%%。请选择要正常退出的应用。\n进程 CPU：100%% 表示占满一个核心；内存为 RSS 合计估算。\n取消或忽略不会关闭任何程序。", cpu)
+    let cores = snapshot["logical_cores"] as? Int ?? 1
+    alert.informativeText = String(format: "整机 CPU %.0f%%（%d 个逻辑核心）。请选择要正常退出的应用。\n清单按采样期间的 CPU 增量计算；100%% 单核 = 一个核心。\n后台任务包含深层子进程，内存为 RSS 合计估算。取消或忽略不会关闭任何程序。", cpu, cores)
     alert.addButton(withTitle: "暂不关闭"); alert.addButton(withTitle: preview ? "预览确认（不退出）" : "退出勾选应用")
     let view = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 280))
     var choices: [(NSButton, String)] = []
     let running = NSWorkspace.shared.runningApplications
     for (i, row) in rows.prefix(8).enumerated() {
         let path = row["path"] as? String ?? ""
-        let name = URL(fileURLWithPath: path).lastPathComponent
-        let title = String(format: "%@   %.0f%% CPU · %d MB", name, row["cpu_core_percent"] as? Double ?? 0, row["rss_mb_sum"] as? Int ?? 0)
+        let name = row["managed_job"] as? String ?? URL(fileURLWithPath: path).lastPathComponent
+        let coreCPU = row["cpu_core_percent"] as? Double ?? 0
+        let machineCPU = row["cpu_machine_percent"] as? Double ?? coreCPU / Double(max(1, cores))
+        let partial = (row["unmeasured_processes"] as? Int ?? 0) > 0 ? "≥" : ""
+        let title = String(format: "%@   %@%.0f%% 整机（%.0f%% 单核）· %d MB", name, partial, machineCPU, coreCPU, row["rss_mb_sum"] as? Int ?? 0)
         let button = NSButton(checkboxWithTitle: title, target: nil, action: nil)
         button.frame = NSRect(x: 0, y: 245 - i * 32, width: 520, height: 30)
         button.isEnabled = path == "iOS 模拟器（全部设备）" || running.contains { $0.bundleURL?.path == path && $0.activationPolicy == .regular && $0.bundleIdentifier != "com.apple.finder" }
@@ -99,20 +112,26 @@ let configURL = root.appendingPathComponent("config.json")
 if !FileManager.default.fileExists(atPath: configURL.path) { writeJSON(defaults, "config.json") }
 let config = (try? JSONSerialization.jsonObject(with: Data(contentsOf: configURL))) as? [String: Any] ?? defaults
 func number(_ key: String) -> Double { (config[key] as? NSNumber)?.doubleValue ?? (defaults[key] as! NSNumber).doubleValue }
-var previous = cpuTicks(); var highSince: Date?; var prompt: Process?
+var previousProcesses = collectProcesses()
+var previous = cpuTicks(); var previousUptime = ProcessInfo.processInfo.systemUptime
+var highSince: Date?; var prompt: Process?
 var lastAlert = Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "resourceWatchLastAlert"))
 var lastSample = Date(); var lastDay = ""
 let once = CommandLine.arguments.contains("--once")
 func sample() {
     let now = Date()
+    let currentProcesses = collectProcesses()
     guard let ticks = cpuTicks(), let old = previous else { previous = cpuTicks(); return }
-    previous = ticks
-    let deltas = zip(ticks, old).map { Double($0 &- $1) }; let total = deltas.reduce(0, +)
-    guard total > 0 else { return }
-    let cpu = 100 * (1 - deltas[2] / total); let mem = pressure()
+    let uptime = ProcessInfo.processInfo.systemUptime; let elapsed = uptime - previousUptime
+    previous = ticks; previousUptime = uptime
+    guard let cpu = hostCPU(old, ticks) else { return }
+    let mem = pressure()
     if now.timeIntervalSince(lastSample) > max(45, number("interval_seconds") * 3) { highSince = nil }
     lastSample = now
-    let snapshot: [String: Any] = ["time": iso.string(from: now), "cpu_percent": cpu, "memory_pressure": mem, "logical_cores": ProcessInfo.processInfo.activeProcessorCount, "top": processes()]
+    var snapshot = processReport(previous: previousProcesses, current: currentProcesses, logicalCores: ProcessInfo.processInfo.activeProcessorCount)
+    previousProcesses = currentProcesses
+    snapshot["time"] = iso.string(from: now); snapshot["cpu_percent"] = cpu; snapshot["memory_pressure"] = mem
+    snapshot["logical_cores"] = ProcessInfo.processInfo.activeProcessorCount; snapshot["host_sample_seconds"] = elapsed
     writeJSON(snapshot, "latest.json")
     let day = String(iso.string(from: now).prefix(10))
     append(snapshot, "samples-\(day).jsonl")
