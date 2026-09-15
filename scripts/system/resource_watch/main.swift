@@ -1,7 +1,7 @@
 import Cocoa
 import Darwin
 
-let buildVersion = "2026-09-15-incidents-v2"
+let buildVersion = "2026-09-15-cpu-5s"
 let args = CommandLine.arguments
 func argument(_ name: String) -> String? { guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }; return args[i + 1] }
 let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/ResourceWatch")
@@ -74,7 +74,7 @@ if args.contains("--prompt") || args.contains("--preview") {
 let once = args.contains("--once")
 let lockFD = open(root.appendingPathComponent("monitor.lock").path, O_CREAT | O_RDWR, 0o600)
 if !once && (lockFD < 0 || flock(lockFD, LOCK_EX | LOCK_NB) != 0) { exit(0) }
-let defaults: [String: Any] = ["interval_seconds": 15, "cpu_threshold": 90, "sustained_seconds": 60, "cooldown_seconds": 1800, "retention_days": 14, "incident_retention_days": 90]
+let defaults: [String: Any] = ["interval_seconds": 15, "cpu_threshold": 90, "sustained_seconds": 60, "prompt_cpu_threshold": 95, "prompt_sustained_seconds": 5, "cooldown_seconds": 1800, "retention_days": 14, "incident_retention_days": 90]
 let configURL = root.appendingPathComponent("config.json")
 if !FileManager.default.fileExists(atPath: configURL.path) { writeJSON(defaults, "config.json") }
 var config = (try? JSONSerialization.jsonObject(with: Data(contentsOf: configURL))) as? [String: Any] ?? defaults
@@ -83,9 +83,15 @@ if let data = try? Data(contentsOf: root.appendingPathComponent("alert-state.jso
 }
 func number(_ key: String) -> Double { let value = (config[key] as? NSNumber)?.doubleValue ?? (defaults[key] as? NSNumber)?.doubleValue ?? 0; return value.isFinite ? value : (defaults[key] as? NSNumber)?.doubleValue ?? 0 }
 let policy = IncidentPolicy(config: config)
+let cpuGate = AutomaticCPUGate(config: config)
 let telemetry = SystemTelemetrySampler(); _ = telemetry.sample()
 let store = try IncidentStore(directory: root.appendingPathComponent("incidents"), recoverInterrupted: !once)
 var previousProcesses = collectProcesses(); var previous = cpuTicks(); var previousUptime = ProcessInfo.processInfo.systemUptime
+var fastPrevious = cpuTicks()
+var fastCPU: Double?
+var fastQualified = false
+var fastCPUSamples: [[String: Any]] = []
+var lastDetailedUptime = ProcessInfo.processInfo.systemUptime
 var lastDay = ""; var promptTask: Process?; var promptID: String?; var promptStarted = 0.0; var promptAcknowledged = false
 var lastAdvice: [String: Any] = [:]; var menu: ResourceMenu?; var lastFailureLog = 0.0
 var promptIdentity: ProcessIdentity?
@@ -135,7 +141,7 @@ func checkPrompt(_ now: Double) {
     }
 }
 
-func sample() {
+func sample(automaticCPUQualified: Bool = false) {
     let now = Date(); let epoch = now.timeIntervalSince1970
     checkPrompt(epoch)
     let current = collectProcesses()
@@ -148,12 +154,18 @@ func sample() {
     snapshot.merge(telemetry.sample()) { _, new in new }
     snapshot["time"] = iso.string(from: now); snapshot["cpu_percent"] = cpu; snapshot["memory_pressure"] = pressure()
     snapshot["build_version"] = buildVersion; snapshot["logical_cores"] = ProcessInfo.processInfo.activeProcessorCount; snapshot["host_sample_seconds"] = elapsed
+    snapshot["prompt_cpu_percent"] = fastCPU as Any? ?? NSNull()
+    snapshot["prompt_cpu_qualified"] = automaticCPUQualified
+    snapshot["prompt_cpu_threshold"] = number("prompt_cpu_threshold")
+    snapshot["prompt_sustained_seconds"] = number("prompt_sustained_seconds")
+    snapshot["prompt_sample_seconds"] = 1
+    if automaticCPUQualified { snapshot["prompt_cpu_samples"] = fastCPUSamples }
     let rows = snapshot["top"] as? [[String: Any]] ?? []
     let processes = snapshot["top_processes"] as? [[String: Any]] ?? []
     let ws = rows.first { ($0["path"] as? String ?? "").hasSuffix("/WindowServer") }?["cpu_core_percent"] as? Double ?? 0
     let topIdentity = processes.first?["action_identity"] as? [String: Any]
     let topID = topIdentity.map { "\($0["pid"] ?? ""):\($0["start_seconds"] ?? ""):\($0["start_microseconds"] ?? "")" }
-    let decision = policy.evaluate(IncidentSignal(now: epoch, cpu: cpu, pressure: pressure(), swapInMBps: snapshot["swap_in_mbps"] as? Double ?? 0, swapOutMBps: snapshot["swap_out_mbps"] as? Double ?? 0, windowServerCPU: ws, topProcessCPU: processes.first?["cpu_core_percent"] as? Double ?? 0, thermal: snapshot["thermal_state"] as? Int ?? 0, topProcessID: topID))
+    let decision = policy.evaluate(IncidentSignal(now: epoch, cpu: cpu, pressure: pressure(), swapInMBps: snapshot["swap_in_mbps"] as? Double ?? 0, swapOutMBps: snapshot["swap_out_mbps"] as? Double ?? 0, windowServerCPU: ws, topProcessCPU: processes.first?["cpu_core_percent"] as? Double ?? 0, thermal: snapshot["thermal_state"] as? Int ?? 0, topProcessID: topID), automaticCPUQualified: automaticCPUQualified)
     snapshot["alert_reasons"] = decision.reasons; snapshot["severity"] = decision.severity
     writeJSON(snapshot, "latest.json")
     let day = String(iso.string(from: now).prefix(10)); append(snapshot, "samples-\(day).jsonl")
@@ -208,5 +220,23 @@ if !once {
     menu = ResourceMenu(showAdvice: { launchPrompt(manual: true) }, openEvidence: { NSWorkspace.shared.open(root.appendingPathComponent("incidents")) })
     eventLog("monitor_started", ["pid": ProcessInfo.processInfo.processIdentifier])
 }
-let timer = Timer.scheduledTimer(withTimeInterval: once ? 2 : max(5, number("interval_seconds")), repeats: true) { _ in sample() }
+// One cheap kernel counter read per second. Expensive process/launchd sampling
+// stays at its normal cadence, with one immediate snapshot on qualification.
+let timer = Timer.scheduledTimer(withTimeInterval: once ? 2 : 1, repeats: true) { _ in
+    if once { sample(); return }
+    let now = Date().timeIntervalSince1970
+    let ticks = cpuTicks()
+    fastCPU = fastPrevious.flatMap { old in ticks.flatMap { hostCPU(old, $0) } }
+    fastPrevious = ticks
+    fastCPUSamples.append(["time": now, "cpu_percent": fastCPU as Any? ?? NSNull()])
+    if fastCPUSamples.count > 8 { fastCPUSamples.removeFirst() }
+    let uptime = ProcessInfo.processInfo.systemUptime
+    let qualified = cpuGate.observe(now: uptime, cpu: fastCPU ?? .nan)
+    let justQualified = qualified && !fastQualified
+    fastQualified = qualified
+    if justQualified || uptime - lastDetailedUptime >= max(5, number("interval_seconds")) {
+        lastDetailedUptime = uptime
+        sample(automaticCPUQualified: qualified)
+    }
+}
 if once { RunLoop.main.run() } else { NSApplication.shared.run() }

@@ -29,9 +29,50 @@ struct IncidentDecision {
     let recovered: Bool
 }
 
+/// Lightweight host-CPU gate, independent of the 15-second diagnostic cadence.
+/// Use one consistent clock for observe and ready (prefer monotonic uptime).
+final class AutomaticCPUGate {
+    private let threshold: Double
+    private let sustainedSeconds: Double
+    private let maxGap: Double
+    private var lastObserved: Double?
+    private var highSince: Double?
+
+    init(config: [String: Any] = [:]) {
+        func value(_ key: String, _ fallback: Double, minimum: Double) -> Double {
+            guard let number = config[key] as? NSNumber, number.doubleValue.isFinite else { return fallback }
+            return max(minimum, number.doubleValue)
+        }
+        threshold = min(100, value("prompt_cpu_threshold", 95, minimum: 95))
+        sustainedSeconds = value("prompt_sustained_seconds", 5, minimum: 1)
+        maxGap = value("prompt_cpu_interval_seconds", 1, minimum: 0.1) * 1.5
+    }
+
+    func reset() { lastObserved = nil; highSince = nil }
+
+    @discardableResult
+    func observe(now: Double, cpu: Double) -> Bool {
+        guard now.isFinite else { reset(); return false }
+        if let previous = lastObserved, now <= previous { reset(); return false }
+        if let previous = lastObserved, now - previous > maxGap { highSince = nil }
+        lastObserved = now
+        guard cpu.isFinite && cpu > threshold && cpu <= 100 else { highSince = nil; return false }
+        if highSince == nil { highSince = now }
+        return ready(at: now)
+    }
+
+    func ready(at now: Double) -> Bool {
+        guard now.isFinite, let last = lastObserved, let since = highSince,
+              now >= last, now - last <= maxGap else { return false }
+        // No extra duration is inferred between the last observation and now.
+        return last - since >= sustainedSeconds
+    }
+}
+
 /// Pure in-memory policy. It never launches a process or changes system state.
 final class IncidentPolicy {
     private let config: [String: Any]
+    private let fallbackCPUGate: AutomaticCPUGate
     private var samples: [IncidentSignal] = []
     private var activeReasons: [String] = []
     private var activeSeverity = "normal"
@@ -42,10 +83,10 @@ final class IncidentPolicy {
     private var presentedRank = 0
     private var pendingRank: Int?
     private var retryAfter = -Double.infinity
-    private var promptHighSince: Double?
 
     init(config: [String: Any] = [:]) {
         self.config = config
+        fallbackCPUGate = AutomaticCPUGate(config: config)
         if let value = config["last_prompt_at"] as? NSNumber, value.doubleValue.isFinite {
             lastPrompt = value.doubleValue
             presentedRank = Self.rank(config["last_prompt_severity"] as? String ?? "warning")
@@ -86,37 +127,29 @@ final class IncidentPolicy {
         return covered >= seconds - 0.001 && matched >= seconds * ratio - 0.001 && matches(samples.last!)
     }
 
-    func evaluate(_ signal: IncidentSignal) -> IncidentDecision {
+    func evaluate(_ signal: IncidentSignal, automaticCPUQualified: Bool? = nil) -> IncidentDecision {
         let empty = IncidentDecision(reasons: [], severity: "normal", shouldRecord: false, shouldPrompt: false, recovered: false)
-        guard signal.now.isFinite else { promptHighSince = nil; return empty }
+        guard signal.now.isFinite else { fallbackCPUGate.reset(); return empty }
+        // The caller normally supplies its fresh one-second gate. A standalone
+        // policy can observe CPU itself, but sparse diagnostic samples never
+        // manufacture five seconds of continuous one-second observations.
+        let fallbackReady = automaticCPUQualified == nil ? fallbackCPUGate.observe(now: signal.now, cpu: signal.cpu) : false
+        let promptCPUReady = automaticCPUQualified ?? fallbackReady
         let gapLimit = number("sample_gap_seconds", max(45, number("interval_seconds", 15, min: 5) * 3), min: 1)
         if let previous = samples.last, signal.now <= previous.now {
             // Ignore duplicate or out-of-order points; they are not new evidence.
+            fallbackCPUGate.reset()
             return IncidentDecision(reasons: activeReasons, severity: activeSeverity, shouldRecord: false, shouldPrompt: false, recovered: false)
         }
         if let previous = samples.last, signal.now - previous.now > gapLimit {
             samples.removeAll()
             recoverySince = nil
-            promptHighSince = nil
         }
-        // Automatic interruption has a stricter policy than evidence recording.
-        // Do not inherit the incident window's 80% tolerance or old CPU=90 config.
-        // More than 1.5 scheduled intervals means a missing observation, so it
-        // cannot establish uninterrupted high CPU even if the new average is high.
-        let promptGap = number("interval_seconds", 15, min: 5) * 1.5
-        if let previous = samples.last, signal.now - previous.now > promptGap { promptHighSince = nil }
-        let promptCPU = min(100, number("prompt_cpu_threshold", 95, min: 95))
-        if signal.cpu.isFinite && signal.cpu >= promptCPU && signal.cpu <= 100 {
-            if promptHighSince == nil { promptHighSince = signal.now }
-        } else { promptHighSince = nil }
-        let promptCPUReady = promptHighSince.map {
-            signal.now - $0 >= number("prompt_sustained_seconds", 60, min: 1)
-        } ?? false
         samples.append(signal)
         let retention = max(windows.max() ?? 180, number("recovery_seconds", 60, min: 1))
         while samples.count > 2 && samples[1].now < signal.now - retention { samples.removeFirst() }
 
-        let instantLow = signal.cpu.isFinite && signal.cpu < number("recovery_cpu_threshold", 60)
+        let instantLow = !promptCPUReady && signal.cpu.isFinite && signal.cpu < number("recovery_cpu_threshold", 60)
             // A stable warning without CPU/paging load no longer meets the
             // overload combination. Unknown or critical pressure cannot recover.
             && [1, 2].contains(signal.pressure)
@@ -136,7 +169,7 @@ final class IncidentPolicy {
         } else { recoverySince = nil }
 
         var reasons: [String] = []
-        if sustained(number("sustained_seconds", 60, min: 1), { $0.cpu >= self.number("cpu_threshold", 90) }) {
+        if promptCPUReady || sustained(number("sustained_seconds", 60, min: 1), { $0.cpu >= self.number("cpu_threshold", 90) }) {
             reasons.append("cpu_critical")
         }
         if sustained(number("moderate_sustained_seconds", 120, min: 1), { $0.cpu >= self.number("moderate_cpu_threshold", 75) }) {
@@ -225,6 +258,11 @@ func incidentAnalysis(snapshot: [String: Any], reasons: [String]) -> [String: An
     if let cpu = numeric("cpu_percent") {
         let cores = max(1, Int(numeric("logical_cores") ?? 1))
         facts.append(String(format: "整机 CPU %.1f%%，共 %d 个逻辑核心；进程 100%% 表示一个核心，不是整机满载。", cpu, cores))
+    }
+    if snapshot["prompt_cpu_qualified"] as? Bool == true, let pulse = numeric("prompt_cpu_percent") {
+        let threshold = numeric("prompt_cpu_threshold") ?? 95
+        let duration = numeric("prompt_sustained_seconds") ?? 5
+        facts.append(String(format: "自动提示依据独立逐秒采样：整机 CPU 已连续 %.0f 秒严格大于 %.1f%%，最近逐秒读数 %.1f%%。上面的完整诊断 CPU 使用较长采样窗口，平均值可能较低；两者时间范围不同。", duration, threshold, pulse))
     }
     let pressure = Int(numeric("memory_pressure") ?? 0)
     facts.append("内存压力：" + ([1: "正常", 2: "警告", 4: "严重"][pressure] ?? "采样不可用") + "。")
