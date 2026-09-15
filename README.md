@@ -1,5 +1,7 @@
 # mactools
 
+**中文** | [English](README_EN.md)
+
 macOS 日常效率工具集，通过 Raycast 快捷调用。
 
 ## 文件操作 (file/)
