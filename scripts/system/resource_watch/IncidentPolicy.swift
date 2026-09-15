@@ -42,6 +42,7 @@ final class IncidentPolicy {
     private var presentedRank = 0
     private var pendingRank: Int?
     private var retryAfter = -Double.infinity
+    private var promptHighSince: Double?
 
     init(config: [String: Any] = [:]) {
         self.config = config
@@ -87,7 +88,7 @@ final class IncidentPolicy {
 
     func evaluate(_ signal: IncidentSignal) -> IncidentDecision {
         let empty = IncidentDecision(reasons: [], severity: "normal", shouldRecord: false, shouldPrompt: false, recovered: false)
-        guard signal.now.isFinite else { return empty }
+        guard signal.now.isFinite else { promptHighSince = nil; return empty }
         let gapLimit = number("sample_gap_seconds", max(45, number("interval_seconds", 15, min: 5) * 3), min: 1)
         if let previous = samples.last, signal.now <= previous.now {
             // Ignore duplicate or out-of-order points; they are not new evidence.
@@ -96,7 +97,21 @@ final class IncidentPolicy {
         if let previous = samples.last, signal.now - previous.now > gapLimit {
             samples.removeAll()
             recoverySince = nil
+            promptHighSince = nil
         }
+        // Automatic interruption has a stricter policy than evidence recording.
+        // Do not inherit the incident window's 80% tolerance or old CPU=90 config.
+        // More than 1.5 scheduled intervals means a missing observation, so it
+        // cannot establish uninterrupted high CPU even if the new average is high.
+        let promptGap = number("interval_seconds", 15, min: 5) * 1.5
+        if let previous = samples.last, signal.now - previous.now > promptGap { promptHighSince = nil }
+        let promptCPU = min(100, number("prompt_cpu_threshold", 95, min: 95))
+        if signal.cpu.isFinite && signal.cpu >= promptCPU && signal.cpu <= 100 {
+            if promptHighSince == nil { promptHighSince = signal.now }
+        } else { promptHighSince = nil }
+        let promptCPUReady = promptHighSince.map {
+            signal.now - $0 >= number("prompt_sustained_seconds", 60, min: 1)
+        } ?? false
         samples.append(signal)
         let retention = max(windows.max() ?? 180, number("recovery_seconds", 60, min: 1))
         while samples.count > 2 && samples[1].now < signal.now - retention { samples.removeFirst() }
@@ -161,7 +176,7 @@ final class IncidentPolicy {
             || signal.now - lastRecord! >= number("record_interval_seconds", 60, min: 1)
         if shouldRecord { lastRecord = signal.now; recordedRank = rank }
         // Dips retain the open incident, but do not trigger a new prompt on stale evidence.
-        let shouldPrompt = !reasons.isEmpty && pendingRank == nil && signal.now >= retryAfter
+        let shouldPrompt = promptCPUReady && !reasons.isEmpty && pendingRank == nil && signal.now >= retryAfter
             && (lastPrompt == nil || signal.now - lastPrompt! >= number("cooldown_seconds", 1800)
                 || rank > presentedRank)
         if shouldPrompt { pendingRank = rank }

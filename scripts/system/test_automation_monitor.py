@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +10,80 @@ import automation_monitor as m
 
 
 class ProgressTests(unittest.TestCase):
+    def update_fixture(self, home, *, npm_failure=False):
+        folder = home / 'Library/Application Support/AutomationUpdates'
+        folder.mkdir(parents=True)
+        path = folder / '20260914-110005.log'
+        text = ('\n--- Homebrew 更新 ---\n'
+                'dingtalk 8.0.2,1 -> 8.5.5,2\n'
+                '   dingtalk: 安装失败\n'
+                '⚠️ 维护结束，存在未完成更新\n'
+                '\n--- npm 全局软件更新 ---\n')
+        path.write_text(text)
+        os.utime(path, (100, 100))
+        failure = 'Homebrew 更新未完成：钉钉；安装需要管理员密码'
+        if npm_failure:
+            failure += '\nnpm 全局软件更新未完成'
+        (folder / 'latest-failure.txt').write_text('软件更新未全部完成\n\n' + failure + '\n\n完整日志：\n' + text)
+        return path
+
+    def test_manual_install_repairs_only_matching_failed_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            token = root / 'dingtalk'
+            (token / '.metadata').mkdir(parents=True)
+            (token / '8.5.5,2').mkdir()
+            receipt = token / '.metadata/INSTALL_RECEIPT.json'
+            text = 'dingtalk 8.0.2,1 -> 8.5.5,2\n'
+            for version, timestamp, expected in [('8.0.2,1', 200, False), ('8.5.5,2', 90, False), ('8.5.5,2', 200, True)]:
+                receipt.write_text(json.dumps({'time': timestamp, 'source': {'version': version}}))
+                self.assertEqual(bool(m.repaired_casks(text, ['dingtalk'], 100, root)), expected)
+
+    def test_legacy_failed_update_then_verified_manual_repair(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            self.update_fixture(home)
+            row = {'pid': None, 'status': 'failed', 'exit_code': 1}
+            with patch.object(m, 'repaired_casks', return_value={}):
+                m.updates(row, home, 300)
+            self.assertEqual(row['status'], 'failed')
+            self.assertEqual([s['done'] for s in row['steps']], [False, True])
+            self.assertIn('管理员密码', row['detail'])
+            with patch.object(m, 'repaired_casks', return_value={'dingtalk': 200}):
+                m.updates(row, home, 300)
+            self.assertEqual(row['status'], 'success')
+            self.assertEqual(row['exit_code'], 1)  # Preserve scheduler history.
+            self.assertTrue(all(s['done'] for s in row['steps']))
+
+    def test_manual_brew_repair_does_not_clear_npm_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            self.update_fixture(home, npm_failure=True)
+            row = {'pid': None, 'status': 'failed'}
+            with patch.object(m, 'repaired_casks', return_value={'dingtalk': 200}):
+                m.updates(row, home, 300)
+            self.assertEqual(row['status'], 'failed')
+
+    def test_new_run_does_not_reuse_old_failure_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            old = self.update_fixture(home)
+            old.with_name('20260915-110005.log').write_text('\n--- Homebrew 更新 ---\n')
+            row = {'pid': None, 'status': 'failed'}
+            m.updates(row, home, 300)
+            self.assertEqual(row['steps'], [])
+            self.assertEqual(row['status'], 'failed')
+
+    def test_structured_receipt_reports_each_completed_stage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            path = self.update_fixture(home)
+            path.with_suffix('.json').write_text(json.dumps({'run_key': path.stem, 'status': 'ok', 'tasks': {name: {'status': 'ok'} for name in m.UPDATE_STAGES}}))
+            row = {'pid': None, 'status': 'waiting'}
+            m.updates(row, home, 300)
+            self.assertEqual(row['status'], 'success')
+            self.assertTrue(all(s['done'] for s in row['steps']))
+
     def test_progress_survives_large_deployment_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'run.log'

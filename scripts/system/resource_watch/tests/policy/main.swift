@@ -35,8 +35,8 @@ var toleranceResult = tolerance.evaluate(signal(0, cpu: 80))
 for time in stride(from: 15, through: 120, by: 15) {
     toleranceResult = tolerance.evaluate(signal(Double(time), cpu: time == 60 ? 55 : 80))
 }
-check(toleranceResult.reasons.contains("cpu_sustained") && toleranceResult.shouldPrompt,
-      "one low point among eight intervals does not erase sustained moderate CPU")
+check(toleranceResult.reasons.contains("cpu_sustained") && toleranceResult.shouldRecord && !toleranceResult.shouldPrompt,
+      "moderate CPU keeps tolerant event recording without automatic interruption")
 let insufficient = IncidentPolicy()
 var insufficientResult = insufficient.evaluate(signal(0, cpu: 80))
 for time in stride(from: 15, through: 120, by: 15) {
@@ -54,12 +54,12 @@ check(gap.evaluate(signal(360, cpu: 95)).shouldPrompt, "a full fresh window afte
 
 let window = IncidentPolicy()
 let windowResult = feed(window, through: 120, cpu: 35, window: 200)
-check(windowResult.reasons.contains("windowserver_sustained") && windowResult.shouldPrompt,
-      "WindowServer alerts below the host CPU threshold")
+check(windowResult.reasons.contains("windowserver_sustained") && windowResult.shouldRecord && !windowResult.shouldPrompt,
+      "WindowServer below the host CPU prompt threshold is recorded silently")
 let process = IncidentPolicy()
 let processResult = feed(process, through: 180, cpu: 15, process: 100)
-check(processResult.reasons.contains("process_sustained") && processResult.severity == "warning" && processResult.shouldPrompt,
-      "a sustained core-consuming process produces a recommendation prompt")
+check(processResult.reasons.contains("process_sustained") && processResult.severity == "warning" && !processResult.shouldPrompt,
+      "a sustained core-consuming process produces recorded recommendations without a prompt")
 let changingProcess = IncidentPolicy()
 var changingResult = changingProcess.evaluate(signal(0, process: 100, identity: "pid-1/start-1"))
 for time in stride(from: 15, through: 300, by: 15) {
@@ -93,10 +93,38 @@ let memoryCritical = IncidentPolicy()
 let memoryCriticalResult = feed(memoryCritical, through: 45, pressure: 4)
 check(memoryCriticalResult.reasons.contains("memory_critical") && memoryCriticalResult.severity == "critical",
       "critical memory pressure independently alerts after 45 seconds")
+check(memoryCriticalResult.shouldRecord && !memoryCriticalResult.shouldPrompt,
+      "critical memory pressure alone records evidence without a prompt")
 let heat = IncidentPolicy()
 check(feed(heat, through: 120, thermal: 2).reasons.contains("thermal_serious"), "serious thermal pressure is covered")
 let criticalHeat = IncidentPolicy()
 check(feed(criticalHeat, through: 60, thermal: 3).severity == "critical", "critical thermal pressure escalates")
+check(!criticalHeat.evaluate(signal(75, thermal: 3)).shouldPrompt, "critical thermal pressure alone cannot prompt")
+
+let belowPromptThreshold = IncidentPolicy(config: ["cpu_threshold": 90, "window_match_ratio": 0.5, "prompt_cpu_threshold": 80])
+let belowPromptResult = feed(belowPromptThreshold, through: 300, cpu: 94.99, pressure: 4, thermal: 3)
+check(belowPromptResult.reasons.contains("cpu_critical") && !belowPromptResult.shouldPrompt,
+      "CPU below 95 cannot prompt even with critical reasons or old/tolerant config")
+let strictDip = IncidentPolicy()
+_ = feed(strictDip, through: 30, cpu: 95)
+_ = strictDip.evaluate(signal(45, cpu: 94.99))
+for time in [60, 75, 90, 105] {
+    check(!strictDip.evaluate(signal(Double(time), cpu: 95)).shouldPrompt,
+          "a single CPU dip resets the full automatic prompt window")
+}
+check(strictDip.evaluate(signal(120, cpu: 95)).shouldPrompt, "exactly 60 fresh seconds after a dip permits a prompt")
+let missedSample = IncidentPolicy()
+_ = feed(missedSample, through: 30, cpu: 95)
+for time in [60, 75, 90, 105] {
+    check(!missedSample.evaluate(signal(Double(time), cpu: 95)).shouldPrompt,
+          "a missing scheduled sample resets automatic prompt continuity")
+}
+check(missedSample.evaluate(signal(120, cpu: 95)).shouldPrompt, "a complete fresh window after a missed sample permits a prompt")
+let invalidCPU = IncidentPolicy()
+_ = feed(invalidCPU, through: 30, cpu: 95)
+check(!invalidCPU.evaluate(signal(45, cpu: .nan)).shouldPrompt, "invalid CPU resets continuity")
+for time in [60, 75, 90, 105] { check(!invalidCPU.evaluate(signal(Double(time), cpu: 95)).shouldPrompt, "invalid CPU cannot fill the strict window") }
+check(invalidCPU.evaluate(signal(120, cpu: 95)).shouldPrompt, "fresh valid CPU window can prompt again")
 
 let retry = IncidentPolicy()
 check(feed(retry, through: 60, cpu: 95).shouldPrompt, "initial prompt dispatch")
@@ -109,19 +137,21 @@ let continued = retry.evaluate(signal(120, cpu: 95))
 check(continued.shouldRecord && !continued.shouldPrompt, "recording proceeds independently during prompt cooldown")
 
 let escalation = IncidentPolicy()
-check(feed(escalation, through: 120, cpu: 80).shouldPrompt, "moderate CPU first presents warning")
-escalation.promptPresented(at: 121)
-for time in [135, 150, 165] { _ = escalation.evaluate(signal(Double(time), cpu: 95)) }
-let escalated = escalation.evaluate(signal(180, cpu: 95))
-check(escalated.severity == "critical" && escalated.shouldPrompt && escalated.shouldRecord,
-      "severity upgrade bypasses prior warning cooldown")
-escalation.promptPresented(at: 181)
-for time in [195, 210, 225, 240] {
+check(!feed(escalation, through: 120, cpu: 80).shouldPrompt, "moderate CPU is silent before manual inspection")
+escalation.promptPresented(at: 121, severity: "warning") // A manually opened warning can still acknowledge presentation.
+for time in [135, 150, 165, 180] {
+    check(!escalation.evaluate(signal(Double(time), cpu: 95)).shouldPrompt, "severity upgrade cannot bypass strict CPU duration")
+}
+let escalated = escalation.evaluate(signal(195, cpu: 95))
+check(escalated.severity == "critical" && escalated.shouldPrompt,
+      "severity upgrade bypasses prior warning cooldown only after the strict CPU gate")
+escalation.promptPresented(at: 196)
+for time in [210, 225, 240, 255] {
     check(!escalation.evaluate(signal(Double(time))).recovered, "recovery requires 60 complete low-load seconds")
 }
-let recovered = escalation.evaluate(signal(255))
+let recovered = escalation.evaluate(signal(270))
 check(recovered.recovered && recovered.shouldRecord && recovered.reasons.isEmpty, "sustained low load resolves and records the incident")
-check(!escalation.evaluate(signal(270, cpu: 95)).shouldRecord, "cleared evidence cannot immediately reopen on one high sample")
+check(!escalation.evaluate(signal(285, cpu: 95)).shouldRecord, "cleared evidence cannot immediately reopen on one high sample")
 
 let warningRecovery = IncidentPolicy()
 _ = feed(warningRecovery, through: 60, cpu: 95, pressure: 2)
@@ -135,14 +165,14 @@ for time in [75, 90, 105, 120] { _ = unknownRecovery.evaluate(signal(Double(time
 check(!unknownRecovery.evaluate(signal(135, pressure: 0)).recovered, "unknown memory pressure cannot prove overload recovery")
 
 let delayedAcknowledgement = IncidentPolicy()
-check(feed(delayedAcknowledgement, through: 120, cpu: 80).shouldPrompt, "warning prompt is pending before escalation")
-for time in [135, 150, 165] { _ = delayedAcknowledgement.evaluate(signal(Double(time), cpu: 95)) }
-let unacknowledgedUpgrade = delayedAcknowledgement.evaluate(signal(180, cpu: 95))
+check(feed(delayedAcknowledgement, through: 60, cpu: 95).shouldPrompt, "qualified high CPU prompt is pending")
+for time in [75, 90, 105] { _ = delayedAcknowledgement.evaluate(signal(Double(time), cpu: 95, pressure: 4)) }
+let unacknowledgedUpgrade = delayedAcknowledgement.evaluate(signal(120, cpu: 95, pressure: 4))
 check(unacknowledgedUpgrade.severity == "critical" && !unacknowledgedUpgrade.shouldPrompt,
-      "unacknowledged warning prevents overlapping prompt dispatch")
-delayedAcknowledgement.promptPresented(at: 181, severity: "warning")
-check(delayedAcknowledgement.evaluate(signal(195, cpu: 95)).shouldPrompt,
-      "explicit older warning acknowledgement still permits a critical upgrade")
+      "additional critical reasons cannot create overlapping prompt dispatch")
+delayedAcknowledgement.promptPresented(at: 121, severity: "critical")
+check(!delayedAcknowledgement.evaluate(signal(135, cpu: 95)).shouldPrompt,
+      "acknowledged critical prompt observes cooldown")
 
 let stalePrompt = IncidentPolicy()
 check(feed(stalePrompt, through: 60, cpu: 95).shouldPrompt, "prepare pending stale prompt")
@@ -167,19 +197,23 @@ let history: [(Double, Int)] = [
 ]
 let replay = IncidentPolicy()
 var firstPrompt: Int?
+var firstRecorded: Int?
 var oldHighSince: Int?
 var oldPrompt: Int?
 for (index, observation) in history.enumerated() {
     let time = index * 15
     let result = replay.evaluate(signal(Double(time), cpu: observation.0, pressure: observation.1))
+    if result.shouldRecord && firstRecorded == nil { firstRecorded = time }
     if result.shouldPrompt && firstPrompt == nil { firstPrompt = time; replay.promptPresented(at: Double(time)) }
     if observation.0 >= 90 || observation.1 == 4 {
         if oldHighSince == nil { oldHighSince = time }
     } else { oldHighSince = nil }
     if let since = oldHighSince, time - since >= 60 && oldPrompt == nil { oldPrompt = time }
 }
-check(firstPrompt == 150, "actual historical host/pressure replay first alerts at 17:12:33 Shanghai")
-check(oldPrompt == 285 && firstPrompt! < oldPrompt!, "legacy continuous-90 rule first alerts at 17:14:48, 135 seconds later")
+check(firstRecorded == 150 && firstPrompt == 285,
+      "historical evidence begins at 17:12:33 but automatic prompt waits for continuous 95 CPU at 17:14:48 Shanghai")
+check(oldPrompt == 285 && firstPrompt == oldPrompt,
+      "this history meets the new stricter gate at the legacy alert time, without suppressing earlier evidence")
 
 let analysis = incidentAnalysis(snapshot: ["cpu_percent": 65, "logical_cores": 10, "memory_pressure": 2,
     "swap_used_mb": 12000, "swap_in_mbps": 0.0, "swap_out_mbps": 0.0,

@@ -166,21 +166,100 @@ def grouped(row, home, now):
     row['quiet_check'] = name == 'reports' and (data.get('finished_at') or now) - data.get('started_at', now) < 10
 
 
+CASKROOM = Path('/opt/homebrew/Caskroom')
+UPDATE_STAGES = ['Homebrew 更新', 'npm 全局软件更新']
+
+
+def repaired_casks(text, tokens, failed_at, caskroom=CASKROOM):
+    """A later install receipt must match the failed run's exact target version."""
+    repaired = {}
+    for token in tokens:
+        if not re.fullmatch(r'[a-z0-9@.+-]+', token):
+            continue
+        targets = re.findall(r'^' + re.escape(token) + r' \S+ -> (\S+)\s*$', text, re.M)
+        try:
+            receipt = read_json(caskroom / token / '.metadata/INSTALL_RECEIPT.json')
+            installed_at = float(receipt.get('time', 0))
+            version = receipt.get('source', {}).get('version')
+            if targets and version == targets[-1] and installed_at > failed_at and (caskroom / token / version).is_dir():
+                repaired[token] = installed_at
+        except (OSError, ValueError, TypeError):
+            continue
+    return repaired
+
+
 def updates(row, home, now):
     files = sorted((home / 'Library/Application Support/AutomationUpdates').glob('????????-??????.log'))
     if not files:
         return
     path = files[-1]
-    text = tail(path)
+    # always_latest writes its final report with read_text() newline handling.
+    text = tail(path).replace('\r\n', '\n').replace('\r', '\n')
     stages = re.findall(r'^--- (.+) ---$', text, re.M)
     row.update(run_key=path.stem, updated_at=path.stat().st_mtime, receipt=str(path), evidence='更新日志与进程退出状态')
-    row['steps'] = [dict(name=name, done=False, status='pending') for name in ['Homebrew 更新', 'npm 全局软件更新']]
+    row['steps'] = [dict(name=name, done=False, status='pending') for name in UPDATE_STAGES]
+    receipt = read_json(path.with_suffix('.json'))
+    if row.get('pid') and (receipt.get('pid') != row['pid'] or receipt.get('status') != 'running'):
+        row.update(phase='等待本轮回执', detail='进程已启动；上一轮的日志不作为本轮进度')
+        return
+    # Old runs lack structured receipts. Trust their final report only when its
+    # full log matches this run; never mix a newer run with an old red alert.
+    failures, tokens, completed = [], [], False
+    if receipt.get('run_key') == path.stem:
+        for step in row['steps']:
+            state = receipt.get('tasks', {}).get(step['name'], {}).get('status', 'pending')
+            step.update(status=state, done=state == 'ok')
+        failures = receipt.get('failures', [])
+        tokens = receipt.get('failed_casks', [])
+        completed = receipt.get('status') in ('ok', 'failed')
+        row['started_at'] = receipt.get('started_at')
+        if completed:
+            states = [step['status'] for step in row['steps']]
+            consistent = (all(s in ('ok', 'failed') for s in states)
+                          and (receipt['status'] == 'ok' and all(s == 'ok' for s in states) and not failures
+                               or receipt['status'] == 'failed' and 'failed' in states and bool(failures)))
+            if not consistent:
+                row.update(status='unknown', phase='更新回执不完整', detail='总结果与分项不一致，无法确认完成')
+                return
+    elif not row.get('pid'):
+        report = tail(path.parent / 'latest-failure.txt')
+        heading, separator, full_log = report.partition('\n\n完整日志：\n')
+        if separator and full_log == text and heading.startswith('软件更新未全部完成\n\n'):
+            failures = heading.split('\n\n', 1)[1].splitlines()
+            tokens = re.findall(r'^\s+([a-z0-9@.+-]+): (?:安装失败|超时)', text, re.M)
+            completed = True
+            for step in row['steps']:
+                name = step['name']
+                failed = any(('Homebrew' if name.startswith('Homebrew') else 'npm') in f for f in failures)
+                if name in stages:
+                    step.update(status='failed' if failed else 'ok', done=not failed)
     if row['status'] == 'running':
         row['phase'] = stages[-1] if stages else '准备更新'
         for step in row['steps']:
             if step['name'] == row['phase']:
                 step['status'] = 'running'
         row['detail'] = '正在更新；需要管理员权限时沿用原授权提示'
+        return
+    if not completed:
+        # Without an end receipt the log stage alone cannot prove completion.
+        row['steps'] = []
+        if receipt.get('run_key') == path.stem and receipt.get('status') == 'running':
+            row.update(status='interrupted', phase='本轮未收到结束回执', detail='进程已停止；已完成分项不代表整轮完成')
+        return
+    if failures:
+        row.update(status='failed', phase='上次更新未全部完成', detail='；'.join(failures), error='；'.join(failures))
+        repaired = repaired_casks(text, tokens, path.stat().st_mtime)
+        only_cask_failure = (len(failures) == 1 and failures[0].startswith('Homebrew 更新未完成')
+                             and '维护结束，存在未完成更新' in text and 'Homebrew 维护失败：' not in text)
+        if tokens and set(repaired) == set(tokens) and only_cask_failure:
+            row['steps'][0].update(done=True, status='ok')
+            when = dt.datetime.fromtimestamp(max(repaired.values())).astimezone().strftime('%m-%d %H:%M')
+            row.update(status='success', phase='上次失败项已补装', detail=f'{when} 安装回执确认：' + '、'.join(tokens) + '；保留原定时运行失败记录', error=None,
+                       evidence='原运行完整日志与随后 Homebrew 安装回执', updated_at=max(repaired.values()))
+        elif repaired:
+            row['detail'] += '；已补装：' + '、'.join(repaired)
+    else:
+        row.update(status='success', phase='软件更新已完成', detail='Homebrew 与 npm 分项回执均已结束', error=None)
 
 
 def collect(home=auto.HOME, now=None):

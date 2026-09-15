@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Weekly software maintenance; successful runs are silent, failures have one report."""
 import fcntl
+import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 
 BIN = Path(__file__).resolve().parent
@@ -46,23 +48,39 @@ def main():
 def maintain():
     stamp = datetime.now().astimezone().strftime('%Y%m%d-%H%M%S')
     log_path = STATE / f'{stamp}.log'
+    # Publish this run before any setup can fail, so an old successful receipt
+    # cannot mask a new startup failure in the monitor.
+    log_path.touch()
     failures = []
+    receipt = dict(run_key=stamp, pid=os.getpid(), started_at=time.time(), status='running', tasks={})
+    def record():
+        path = STATE / f'{stamp}.json'
+        temp = path.with_suffix('.tmp')
+        temp.write_text(json.dumps(receipt, ensure_ascii=False, indent=2))
+        temp.replace(path)
+    record()
     env = dict(os.environ)
     node = node_bin()
     env['PATH'] = ':'.join(filter(None, [str(node) if node else None, '/opt/homebrew/bin', env.get('PATH', '')]))
     with log_path.open('w') as log:
         def run(label, command):
+            task = receipt['tasks'][label] = dict(status='running', started_at=time.time())
+            record()
             print(f'{label}… 日志：{log_path}', flush=True)
             log.write(f'\n--- {label} ---\n')
             log.flush()
             try:
                 result = subprocess.run(command, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, timeout=10800)
+                task.update(status='failed' if result.returncode else 'ok', exit_code=result.returncode, finished_at=time.time())
+                record()
                 if result.returncode:
                     failures.append(f'{label}未完成')
                 return result.returncode
             except (OSError, subprocess.TimeoutExpired) as exc:
                 log.write(f'{exc}\n')
                 failures.append(f'{label}未完成')
+                task.update(status='failed', finished_at=time.time())
+                record()
                 return 1
         run('Homebrew 更新', [sys.executable, '-u', str(BIN / 'brew_maintain.py'), '--auto', '--gui-sudo'])
         npm = str(node / 'npm') if node else shutil.which('npm', path=env['PATH'])
@@ -78,8 +96,10 @@ def maintain():
             except (OSError, ValueError, subprocess.SubprocessError) as exc:
                 log.write(f'npm 检查失败：{exc}\n')
                 failures.append('npm 全局目录检查失败')
+                receipt['tasks']['npm 全局软件更新'] = dict(status='failed', reason='全局目录检查失败')
         else:
             failures.append('未找到 npm 更新程序')
+            receipt['tasks']['npm 全局软件更新'] = dict(status='failed', reason='未找到更新程序')
         log.flush()
     log_text = log_path.read_text()
     failed_casks = re.findall(r'^\s+([a-z0-9@.+-]+): (?:安装失败|超时)', log_text, re.MULTILINE)
@@ -92,6 +112,8 @@ def maintain():
         if '管理员授权已取消或超时' in log_text:
             failures[0] += '；管理员授权已取消或超时'
     failure_count = len(failures) + max(0, len(failed_casks) - 1)
+    receipt.update(status='failed' if failures else 'ok', finished_at=time.time(), failures=failures, failed_casks=failed_casks)
+    record()
     notify = [sys.executable, str(BIN / 'task_notify.py'), '--key', 'software-updates']
     if failures:
         details = STATE / 'latest-failure.txt'
