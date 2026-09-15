@@ -21,7 +21,10 @@ binary.parent.mkdir(parents=True, exist_ok=True)
 # monitor keeps its existing image until the jobs controller reloads it.
 with tempfile.TemporaryDirectory(prefix='.resource-watch-build-', dir=binary.parent) as staging:
     built = Path(staging) / binary.name
-    subprocess.run(['swiftc', str(Path(__file__).with_name('main.swift')), str(Path(__file__).with_name('ProcessSampling.swift')), '-O', '-framework', 'Cocoa', '-o', str(built)], check=True)
+    sources = ['main.swift', 'ProcessSampling.swift', 'Telemetry.swift', 'IncidentPolicy.swift',
+               'IncidentStore.swift', 'SafeActions.swift', 'PromptUI.swift', 'AdditionalDiagnostics.swift']
+    subprocess.run(['swiftc', *[str(Path(__file__).with_name(name)) for name in sources],
+                    '-O', '-framework', 'Cocoa', '-o', str(built)], check=True)
     os.replace(built, binary)
 if args.build_only:
     print(f'Updated {binary}; reload only resource-watch through jobs/ctl')

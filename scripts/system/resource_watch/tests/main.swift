@@ -15,8 +15,11 @@ func sample(_ rows: [ProcessReading], _ uptime: Double, _ jobs: [Int: String] = 
 check(cpuTimeSeconds("900:04.95") == 54004.95, "TIME minutes are cumulative, not CPU percent")
 check(cpuTimeSeconds("1-02:03:04.50") == 93784.5, "day/hour TIME format")
 check(cpuTimeSeconds("invalid") == nil, "invalid TIME is not zero")
-let (parsed, failures) = parseProcesses(" 12 1 Mon Sep 14 12:00:00 2026 900:04.95 2048 /Applications/Resource Watch.app/Contents/MacOS/resource-watch\ninvalid")
+let (parsed, failures) = parseProcesses(" 12 1 Mon Sep 14 12:00:00 2026 900:04.95 2048 S /Applications/Resource Watch.app/Contents/MacOS/resource-watch\ninvalid")
 check(parsed[12]?.path == "/Applications/Resource Watch.app/Contents/MacOS/resource-watch" && failures == 1, "parse spaced app paths and report bad rows")
+check(parsed[12]?.stat == "S", "process state is sampled without command arguments")
+let (padded, _) = parseProcesses(" 12 1 Mon Sep 14 12:00:00 2026 900:04.95 2048 S    /Applications/Resource Watch.app/Contents/MacOS/resource-watch")
+check(padded[12]?.path == "/Applications/Resource Watch.app/Contents/MacOS/resource-watch", "ps state column padding cannot become part of the executable path")
 check(parseJobs("PID Status Label\n12 0 com.tianli.report\n- 0 com.tianli.waiting\n13 0 com.notifhub.daemon\n14 0 cyou.tianli.agent\n15 0 com.apple.ignored").count == 3, "only running managed jobs have root PIDs")
 
 // Two Python jobs and a grandchild must remain distinct. Each own CPU delta is
@@ -44,4 +47,81 @@ check((reset["process_coverage"] as! [String: Any])["measured"] as? Int == 0, "C
 let zeroWindow = processReport(previous: after, current: after, logicalCores: 10)
 check((zeroWindow["process_coverage"] as! [String: Any])["measured"] as? Int == 0, "zero-duration sample is not a CPU measurement")
 check(JSONSerialization.isValidJSONObject(report), "null coverage and numeric fields serialize to JSON")
-print("PASS: \(passed) process sampling and job attribution checks")
+
+// Memory ranking starts from the entire snapshot, not the CPU top 15.
+let busyBefore = (100..<120).map { reading($0, 1, 0, "/busy-\($0)") }
+let busyAfter = (100..<120).map { reading($0, 1, 100, "/busy-\($0)") }
+let idleLarge = ProcessReading(pid: 130, ppid: 1, startedAt: "same", cpuSeconds: 0, rssKB: 1024 * 1024, path: "/idle-memory")
+let memoryReport = processReport(previous: sample(busyBefore + [idleLarge], 10), current: sample(busyAfter + [idleLarge], 20), logicalCores: 8)
+check(!(memoryReport["top"] as! [[String: Any]]).contains { $0["path"] as? String == "/idle-memory" }, "memory fixture lies outside CPU top 15")
+check((memoryReport["top_memory"] as! [[String: Any]]).first?["path"] as? String == "/idle-memory", "idle large process appears first in memory groups")
+check((memoryReport["top_memory_processes"] as! [[String: Any]]).first?["pid"] as? Int == 130, "RSS process ranking uses all observed processes")
+
+let browser = reading(200, 1, 0, "/Applications/Browser.app/Contents/MacOS/Browser")
+let browserWorker = reading(201, 200, 0, "/usr/local/bin/node")
+let terminal = reading(210, 1, 0, "/Applications/Ghostty.app/Contents/MacOS/ghostty")
+let shell = reading(211, 210, 0, "/bin/zsh")
+let terminalWorker = reading(212, 211, 0, "/usr/local/bin/python3")
+let ancestry = sample([browser, browserWorker, terminal, shell, terminalWorker], 20)
+let ancestryReport = processReport(previous: ancestry, current: ancestry, logicalCores: 8)
+let ancestryDetails = ancestryReport["top_processes"] as! [[String: Any]]
+check(ancestryDetails.first { $0["pid"] as? Int == 201 }?["group"] as? String == "/Applications/Browser.app", "non-app GUI child inherits nearest app parent")
+check(ancestryDetails.first { $0["pid"] as? Int == 212 }?["terminal_protected"] as? Bool == true, "deep terminal descendant remains protected")
+check(ancestryDetails.first { $0["pid"] as? Int == 201 }?["terminal_protected"] as? Bool == false, "ordinary GUI worker is distinguishable from terminal tasks")
+let zombie = ProcessReading(pid: 220, ppid: 200, startedAt: "same", cpuSeconds: 0, rssKB: 0, path: "/zombie", stat: "Z")
+let zombieReport = processReport(previous: sample([zombie], 1), current: sample([zombie], 2), logicalCores: 8)
+check(zombieReport["zombie_count"] as? Int == 1, "zombie state is diagnostic evidence, not automatic cleanup authorization")
+
+let identity1 = ProcessIdentity(pid: 240, parentPID: 1, userID: 501, startSeconds: 100, startMicroseconds: 1)
+let identity2 = ProcessIdentity(pid: 240, parentPID: 1, userID: 501, startSeconds: 100, startMicroseconds: 2)
+let quick1 = ProcessReading(pid: 240, ppid: 1, startedAt: "same second", cpuSeconds: 1, rssKB: 10, path: "/quick", identity: identity1)
+let quick2 = ProcessReading(pid: 240, ppid: 1, startedAt: "same second", cpuSeconds: 2, rssKB: 10, path: "/quick", identity: identity2)
+let quickReport = processReport(previous: sample([quick1], 1), current: sample([quick2], 2), logicalCores: 8)
+check((quickReport["process_coverage"] as! [String: Any])["measured"] as? Int == 0, "microsecond identity rejects PID reuse inside the same ps start second")
+check(processIdentity(Int(getpid()))?.pid == Int(getpid()), "live identity can be read for the test process")
+
+let normal = samplingCommand("/bin/echo", ["sampling-ok"])
+check(normal.output == "sampling-ok\n" && normal.health["succeeded"] as? Bool == true, "bounded command preserves successful output")
+let missing = samplingCommand("/nonexistent/resource-watch-test", [])
+check(missing.output == nil && missing.health["error"] as? String == "spawn_failed", "spawn error is explicit health evidence")
+let failed = samplingCommand("/bin/sh", ["-c", "exit 7"])
+check(failed.output == nil && failed.health["exit_code"] as? Int32 == 7, "nonzero exit is distinct from empty successful output")
+let overflow = samplingCommand("/usr/bin/yes", ["fixture"], timeout: 1, outputLimit: 1024)
+check(overflow.output == nil && overflow.health["output_truncated"] as? Bool == true, "unbounded output cannot exhaust sampler memory")
+
+let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("resource-watch-owned-child-\(UUID().uuidString)")
+defer { try? FileManager.default.removeItem(at: temporary) }
+let unrelated = Process()
+unrelated.executableURL = URL(fileURLWithPath: "/bin/sleep"); unrelated.arguments = ["10"]
+try unrelated.run()
+defer { if unrelated.isRunning { unrelated.terminate() } }
+let unrelatedIdentity = processIdentity(Int(unrelated.processIdentifier))!
+let timeoutStart = ProcessInfo.processInfo.systemUptime
+let timed = samplingCommand("/bin/sh", ["-c", "trap '' TERM; sleep 20 & printf '%s' \"$!\" > \"$1\"; wait", "fixture", temporary.path], timeout: 0.15)
+check(timed.output == nil && timed.health["timed_out"] as? Bool == true, "hung command times out")
+check(ProcessInfo.processInfo.systemUptime - timeoutStart < 1.5, "TERM-ignoring command cannot block sampling indefinitely")
+check(timed.health["cleanup_scope"] as? String == "owned_unreaped_child_process_group" && timed.health["child_reaped"] as? Bool == true, "cleanup is limited to owned group while PID reuse is impossible")
+let childPID = Int((try? String(contentsOf: temporary, encoding: .utf8)) ?? "")!
+Thread.sleep(forTimeInterval: 0.15)
+check(processIdentity(childPID) == nil, "timeout also ends the sampler-created child process")
+check(unrelated.isRunning && processIdentity(Int(unrelated.processIdentifier)).map { unrelatedIdentity.sameInstance(as: $0) } == true,
+      "timeout cleanup leaves an unrelated running process instance untouched")
+unrelated.terminate()
+let exitedParent = samplingCommand("/bin/sh", ["-c", "sleep 20 & exit 0"], timeout: 0.15)
+check(exitedParent.health["timed_out"] as? Bool == true && exitedParent.health["child_reaped"] as? Bool == true, "descendant holding stdout open is bounded after its parent exits")
+
+let firstCounter = SwapCounterReading(uptime: 100, wallTime: 1000, swapInPages: 100, swapOutPages: 200)
+let nextCounter = SwapCounterReading(uptime: 110, wallTime: 1010, swapInPages: 740, swapOutPages: 1480)
+check(swapRates(previous: nil, current: firstCounter, pageSize: 16384)["swap_in_mbps"] is NSNull, "first swap sample has no invented zero rate")
+let rates = swapRates(previous: firstCounter, current: nextCounter, pageSize: 16384)
+check(rates["swap_in_mbps"] as? Double == 1 && rates["swap_out_mbps"] as? Double == 2, "swap rates use page size and real sample seconds")
+let gap = SwapCounterReading(uptime: 300, wallTime: 1200, swapInPages: 740, swapOutPages: 1480)
+check(swapRates(previous: firstCounter, current: gap, pageSize: 16384)["swap_in_mbps"] is NSNull, "sampling gap invalidates swap rate")
+let sleepGap = SwapCounterReading(uptime: 110, wallTime: 1200, swapInPages: 740, swapOutPages: 1480)
+check(swapRates(previous: firstCounter, current: sleepGap, pageSize: 16384)["swap_in_mbps"] is NSNull, "sleep or wall-clock discontinuity invalidates swap rate")
+let resetCounter = SwapCounterReading(uptime: 110, wallTime: 1010, swapInPages: 1, swapOutPages: 2)
+check(swapRates(previous: firstCounter, current: resetCounter, pageSize: 16384)["swap_rate_status"] as? String == "counter_reset", "counter reset is recorded")
+let telemetry = SystemTelemetrySampler().sample()
+check(JSONSerialization.isValidJSONObject(telemetry) && telemetry["telemetry_health"] is [String: Any], "live telemetry is JSON serializable and reports collection health")
+check(telemetry["swap_in_mbps"] is NSNull, "live first snapshot preserves unknown swap rate")
+print("PASS: \(passed) process sampling, command cleanup and telemetry checks")
